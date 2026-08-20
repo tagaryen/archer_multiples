@@ -1,0 +1,47 @@
+{
+    "log": {
+        "desc": "日志相关配置",
+        "path": "logs",
+        "level": "TRACE"
+    },
+    "http": {
+        "desc": "http服务端配置",
+        "host": "0.0.0.0",
+        "port": 9617,
+        "multithread": true,
+        "threadNum": 2,
+        "enableSsl": false,
+        "crtPath": "",
+        "keyPath": "",
+        "enCrtPath": "",
+        "enKeyPath": "",
+
+        "fileServer": {
+            "desc": "文件服务配置, authKey大小要求16个字符",
+            "enable": true,
+            "staticDir": "data",
+            "authKey": "e11!^cvvcs$a1@ad"
+        },
+        
+        "proxyServer": {
+            "desc": "代理服务端配置, authKey大小要求16个字符",
+            "enable": true,
+            "authKey": "tg$1!^cv1%%*(a=+"
+        }
+    },
+    "remoteStorageServer": {
+        "desc": "remoteStorageServer服务端配置, authKey大小要求16个字符",
+        "enable": true,
+        "host": "0.0.0.0",
+        "port": 9611,
+        "multithread": true,
+        "threadNum": 2,
+        "authKey": "u&*1l)+yv1%*:^tg"
+    },
+    "database": {
+        "desc": "lmdb数据库配置",
+        "path": "database",
+        "readers": 4,
+        "memory": 136577024
+    }
+}

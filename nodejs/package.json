@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "multiparty": "^4.2.3",
+    "zip-lib": "^1.4.0"
+  },
+  "pkg": {
+    "scripts": [
+      "node_modules/**/*.js"
+    ]
+  }
+}

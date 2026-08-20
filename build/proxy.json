@@ -1,0 +1,16 @@
+{
+    "name":"某某代理配置",
+    "requestPath": "/base",
+    "location":"/root/static",
+    "proxyUrl": "http://localhost:9888/api",
+    "proxySsl": {
+        "verifyPeer": false,
+        "caPath": "/root/certs/ca.crt",
+        "crtPath": "/root/certs/client.crt",
+        "keyPath": "/root/certs/client.key",
+        "enCrtPath": "/root/certs/client_encrypt.crt",
+        "enKeyPath": "/root/certs/client_encrypt.key"
+    },
+    "requestHeaders": {},
+    "responseHeaders":{}
+}

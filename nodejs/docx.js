@@ -1,0 +1,49 @@
+const textHtml = 
+`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>$(title_template)</title>
+    <link rel = "icon" href = "$(icon_template)" type = "image/x-icon">
+    <style>
+        #preview { border: 1px solid #ccc; padding: 10px; height: calc(100% - 22px); overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div id="preview"></div>
+    <script type="module">
+        import { renderAsync } from '/npmjs/docx';
+        const textBase64 = "$(docx_template)";
+        const binaryStr = atob(textBase64);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {bytes[i] = binaryStr.charCodeAt(i);}
+        const file = new Blob([bytes], { type: 'text/plain;charset=utf-8' });
+        const container = document.getElementById('preview');
+        container.innerHTML = '正在加载文档...';
+        try {
+            await renderAsync(file, container, null, {
+                className: 'docx',
+                inWrapper: true,
+                breakPages: true,
+                renderHeaders: true,
+                renderFooters: true,
+            });
+            console.log('✅ 文档渲染成功');
+        } catch (e) {
+            console.error('❌ 渲染失败:', e);
+            container.innerHTML = '文档加载失败，请检查文件格式';
+        }
+    </script>
+</body>
+</html>`;
+
+
+
+function handleDocxHtml(title, icon, docxBase64) {
+    let txt = textHtml;
+    txt = txt.replace("$(title_template)", title);
+    txt = txt.replace("$(icon_template)", icon);
+    return txt.replace("$(docx_template)", docxBase64);
+}
+
+module.exports = handleDocxHtml;

@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>静态资源服务</title>
+  <link rel = "icon" href = "/ico" type = "image/x-icon">
+</head>
+<body>
+<div class="File">
+  <div class="file-head">
+    <div class="file-title">静态资源</div>
+    <div class="file-upload">
+      <button class="file-btn" onclick="showFileUpload()">文件上传</button>
+      <div id="modal-file-overlay" class="modal-file-overlay">
+      <div class="modal-file-content">
+        <div class="modal-file-header">
+          <div>文件上传</div>
+          <button onclick="closeFileUpload()" class="close-btn">✖</button>
+        </div>
+        <div id='file-upload-dropzone' class="file-upload-dropzone" onclick="triggerFileInput()">
+          <div class="file-upload-dropzone-content">
+            <svg class="upload-icon" viewBox="0 0 24 24"><path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" /></svg>
+            <div style="font-size: 18px;">拖拽或选择文件</div>
+            <input type="file" id="file-input" onchange="onFileChange(event)" class="file-input" multiple>
+          </div>
+        </div>
+        <div class="file-data" id='file-data'>
+          <div class="file-info">
+            <span class="file-name" id="upload-file-name"></span>
+            <span class="file-size" id="upload-file-size"></span>
+          </div>
+          <button onclick="removeFile()" id='remove-btn' class="remove-btn">&times;</button>
+        </div>
+        <div id='file-progress-area' style="text-align: center; min-height: 21px; width: calc(100% - 72px);margin: 0px 36px ;">
+          <div style="width: calc(100% - 32px); text-align: left; position: relative; line-height: 20px; margin-right: 6px;">
+            <div id='file-progress' style="height: 10px; background-color: #409eff; border-radius: 6px; margin-top: 6px;"></div>
+          </div>
+          <div style="width: 38px; line-height: 20px;" id="upload-percentage"></div>
+        </div>
+        <div class="modal-file-footer" id = 'modal-file-footer'>
+          <button onclick="closeFileUpload()" class="cancel-btn">取消</button>
+          <button onclick="uploadFile()" class="upload-btn" id = 'upload-btn'>上传</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class = "file-area">
+    <div class="list-title" id="file-title"></div>
+    <div class="file-list" id="file-list"></div>
+    <div class="file-page" id="file-page">
+      <button class = "file-page-btn" id="file-page-btn-1" onclick="prevPage()" onmouseover="pageMouseover(1)" onmouseout="pageMouseout()">上一页</button>
+      <span id="page-desc"></span>
+      <button class = "file-page-btn" id="file-page-btn-2" onclick="nextPage()" onmouseover="pageMouseover(2)" onmouseout="pageMouseout()">下一页</button>
+    </div>
+  </div>  
+  <div class="remove-password-card" id="remove-password-card">
+    <div class="remove-password-body">
+      <div class="remove-password-input">
+        <div class="remove-password-wrapper">
+          <input type="password" id="password-input" placeholder="请输入密码" autocomplete="off">
+        </div>
+        <div class="remove-password-error" id="remove-password-error"></div>
+      </div>
+      <div class="remove-password-actions">
+        <button class="remove-password-cancel" id="cancelModalBtn" onclick="deleteFileCancel()">取消</button>
+        <button class="remove-password-confirm" id="confirmPasswordBtn" onclick="confirmDeleteFile()">确认</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="text/javascript">
+const global = {
+    fileUploadShow: false,
+    file: null,
+    percentage: 0,
+    uploadText: '上传',
+    total: 0,
+    pageNum: 1,
+    pages: 0,
+    deleteFile: null
+}
+function truncateByCanvas(str, maxWidth, fontSize = 14, fontFamily = 'Arial') {
+  let ctx = document.createElement('canvas').getContext('2d');
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  let result = '';
+  for (let ch of str) {
+    let test = result + ch;
+    if (ctx.measureText(test).width > maxWidth) {
+      return result + '...';
+    }
+    result = test;
+  }
+  return result;
+}
+function drawToolTips(el, content, side) {
+  let elId = `archer-tooltip-${side}`
+  const rect = el.getBoundingClientRect();
+  let afterCssRule = `#${elId}::after {content: ''; position: absolute; top: 50%; right: 100%; transform: translateY(-50%); border: 9px solid transparent; border-right-color: #e2e8f0; pointer-events: none; }`
+  let left = rect.right + 16;
+  let top = rect.top + rect.height / 2 - 12;
+  let tooltip = document.getElementById(elId);
+  if(tooltip) {
+    tooltip.innerHTML = content;
+    tooltip.style.display = 'inline-block';
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+    return;
+  }
+  if(afterCssRule) {
+    tooltip = document.createElement('div');
+    tooltip.id = elId;
+    tooltip.innerHTML = content;
+    tooltip.style.display = 'inline-block';
+    tooltip.style.position = 'absolute';
+    tooltip.style.zIndex = '1000';
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+    tooltip.style.display = 'inline-block';
+    tooltip.style.padding = '4px 6px';
+    tooltip.style.fontSize = '14px';
+    tooltip.style.lineHeight = '1.5';
+    tooltip.style.borderRadius = '8px';
+    tooltip.style.backgroundColor = '#e2e8f0';
+    tooltip.style.boxShadow = '0 8px 28px rgba(0, 0, 0, 0.18)';
+    tooltip.style.textAlign = 'center';
+    tooltip.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+    const sheet = document.styleSheets[0];
+    for(let rule of sheet.cssRules) {
+      if (rule.selectorText === `#${elId}::after`) {
+        return ;
+      }
+    }
+    sheet.insertRule(afterCssRule, sheet.cssRules.length);
+    document.body.appendChild(tooltip);
+  }
+}
+function removeToolTips(side) {
+  let elId = `archer-tooltip-${side}`
+  let tooltip = document.getElementById(elId);
+  if(tooltip) {
+    tooltip.style.display = 'none';
+    return;
+  }
+}
+function fileuploadDropAreaInit() {
+    let dropArea = document.getElementById('file-upload-dropzone');  
+    dropArea.style.display = 'block';
+
+    let fileInput = document.getElementById('file-input');  
+  
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {  
+        dropArea.addEventListener(eventName, (e) => {
+            e.preventDefault();  
+            e.stopPropagation();  
+        }, false);  
+    });  
+  
+    // 高亮效果  
+    ['dragenter', 'dragover'].forEach(eventName => {  
+      dropArea.addEventListener(eventName, () => {dropArea.classList.add('drag-over')}, false);  
+    });  
+  
+    ['dragleave', 'drop'].forEach(eventName => {  
+      dropArea.addEventListener(eventName, () => {dropArea.classList.remove('drag-over')}, false);  
+    });  
+  
+    dropArea.addEventListener('drop', (e) => {  
+        let dt = e.dataTransfer;  
+        let files = dt.files;  
+        if (files.length === 0) return;  
+        addFile(files[0]);  
+    }, false);
+
+    let fileData = document.getElementById('file-data');  
+    fileData.style.display = 'none';
+    
+    let removeBtn = document.getElementById('remove-btn');  
+    removeBtn.disabled = false;
+    
+    let fileProgressArea = document.getElementById('file-progress-area');  
+    fileProgressArea.style.display = 'none';
+    
+    let fileProgress = document.getElementById('file-progress');  
+    fileProgress.style.width = '0%';
+
+    let uploadPercentage = document.getElementById('upload-percentage');  
+    uploadPercentage.innerHTML = "0%"
+
+    
+    let fileFooter = document.getElementById('modal-file-footer');  
+    fileFooter.style.display = 'none';
+}
+function showFileUpload() {
+    fileuploadDropAreaInit();
+
+    let fileUpload = document.getElementById('modal-file-overlay');
+    fileUpload.style.display = 'flex';
+}
+function closeFileUpload() {
+    let fileUpload = document.getElementById('modal-file-overlay');
+    fileUpload.style.display = 'none';
+}
+function addFile(file) {
+    if(!file) {
+        console.log("未添加文件");
+        return;
+    }
+    global.file = file;
+    
+    let fileFooter = document.getElementById('modal-file-footer');  
+    fileFooter.style.display = 'flex';
+    
+    let dropArea = document.getElementById('file-upload-dropzone');  
+    dropArea.style.display = 'none';
+
+    let fileData = document.getElementById('file-data');  
+    fileData.style.display = 'flex';
+    
+    let uploadFileName = document.getElementById('upload-file-name');  
+    let uploadFileSize = document.getElementById('upload-file-size');      
+    uploadFileName.innerHTML = global.file?global.file.name:"" ; 
+    uploadFileSize.innerHTML = formatFileSize(global.file?global.file.size:0);
+
+    let uploadBtn = document.getElementById('upload-btn');  
+    uploadBtn.innerHTML = "上传"
+    uploadBtn.disabled = false;
+
+}
+
+function removeFile() {
+    global.file = null;
+    fileuploadDropAreaInit();
+}
+
+function onFileChange(e) {
+    addFile(e.target.files[0])
+}
+
+function triggerFileInput() {
+    let fileInput = document.getElementById('file-input');
+    fileInput.click();  
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+function refreshFileList(pageNum) {
+    let data = {total: 0, pageNum: 1, files: []};
+    try {
+        let xhr = new XMLHttpRequest();  
+        xhr.open('GET', '/list?pageNum='+pageNum, false);  
+        xhr.send(null); 
+        if(xhr.status === 200) {
+            let res = JSON.parse(xhr.responseText);
+            if(res.success && res.data) {
+                data = res.data;
+            }
+        }
+    } catch(err) {
+        console.log(err);
+    }
+    
+    let fileTitle = document.getElementById('file-title');  
+    let fileTitleHtml = '<label class="filename title-content" style="padding-left: 10px;">名称</label>' +
+        '<label class="fileurl title-content">在线预览</label>' +
+        '<label class="filetime title-content">时间</label>' +
+        '<label class="fileaction title-content">操作</label>';
+    fileTitle.innerHTML = fileTitleHtml;
+
+    let fileList = document.getElementById('file-list');  
+    let html = "", i = 0, fUrl = '', fName = '';
+    for(let f of data.files) {
+        fUrl = "/"+f.url;
+        fUrl = fUrl.length > 28 ? fUrl.substr(0, 28) + "..." : fUrl
+        fName = truncateByCanvas(f.name, 190, 18);
+        html += '<div class="list-content">';
+        html += '<label class="filename item-content name-content"><div class="filename-item" onclick="downloadFileByName(\''+f.name+'\')" onmouseover="drawToolTips(this, \'点击下载\', \'left\')" onmouseout="removeToolTips(\'left\')">'+fName+'</div></label>';
+        html += '<label class="fileurl item-content" >';
+        html += '<a href=/'+f.url+' target="_blank">'+fUrl+ '</a>';
+        html += '</label >';
+        html += '<label class="filetime item-content time-content">'+f.time+'</label>';
+        html += '<label class="filedelete item-content" onclick="deleteFileByName(\''+f.name+'\')">删除</label>';
+        html += '</div>';
+    }
+    fileList.innerHTML = html;
+
+    global.pageNum = data.pageNum;
+    global.total = data.total;
+    global.pages = Math.ceil(data.total / 10)
+    
+    let filePage = document.getElementById('file-page'); 
+    if(global.pages <= 1) {
+      filePage.style.display = 'none';
+    } else {
+      filePage.style.display = 'flex';
+    }
+
+    let pageBtn1 = document.getElementById('file-page-btn-1'); 
+    let pageBtn2 = document.getElementById('file-page-btn-2');
+    if(global.pageNum <= 1) {
+        pageBtn1.disabled = true;
+    } else {
+        pageBtn1.disabled = false;
+    }
+    if(global.pageNum >= global.pages) {
+        pageBtn2.disabled = true;
+    } else {
+        pageBtn2.disabled = false;
+    }
+    
+    let pageDesc = document.getElementById('page-desc');
+    pageDesc.style.lineHeight = '32px';
+    pageDesc.innerHTML = `第 ${global.pageNum} 页，共 ${global.pages} 页`
+}
+
+function uploadFile() {  
+    global.percentage = 0;
+
+    if(!global.file) {
+        console.log("未选择文件");
+        return ;
+    }
+
+    let uploadBtn = document.getElementById('upload-btn');  
+    uploadBtn.innerHTML = "上传中"
+    uploadBtn.disabled = true;
+
+    let formData = new FormData();  
+    formData.append('file', global.file);  
+
+    let fileData = document.getElementById('file-data');  
+    fileData.style.display = 'flex';
+
+    let removeBtn = document.getElementById('remove-btn');  
+    removeBtn.disabled = true;
+
+    let fileProgressArea = document.getElementById('file-progress-area');  
+    fileProgressArea.style.display = 'flex';
+
+    let uploadPercentage = document.getElementById('upload-percentage');  
+    let fileProgress = document.getElementById('file-progress');  
+
+    let xhr = new XMLHttpRequest();  
+    // 监听上传进度  
+    xhr.upload.addEventListener('progress', function(event) { 
+        if (event.lengthComputable) {  
+            let percentComplete = Math.ceil((event.loaded / event.total) * 100);  
+            fileProgress.style.width = percentComplete + '%';
+            uploadPercentage.innerHTML = percentComplete===0?"":(percentComplete+"%")
+        }  
+    }, false);  
+    
+    xhr.addEventListener('load', function() { 
+        fileProgress.style.width = '100%';
+        let uploadArea = document.getElementById('modal-file-overlay')
+        uploadArea.style.display = 'none';
+
+        refreshFileList(global.pageNum);
+    });  
+    
+    xhr.addEventListener('error', function() { 
+        let uploadArea = document.getElementById('modal-file-overlay')
+        uploadArea.style.display = 'none';
+    }); 
+    xhr.open('POST', '/upload', true);
+    xhr.send(formData); 
+}  
+
+function downloadFileByName(name) {
+  window.open('/download?filename='+name);
+}
+
+function deleteFileByName(name) {
+    let removePwd = document.getElementById('remove-password-card');
+    removePwd.style.display = 'block';
+    global.deleteFile = name;
+    let error = document.getElementById('remove-password-error');
+    error.innerHTML = ""
+}
+
+function deleteFileCancel() {
+    let removePwd = document.getElementById('remove-password-card');
+    removePwd.style.display = 'none';
+    global.deleteFile = null;
+}
+
+function confirmDeleteFile() {
+    let error = document.getElementById('remove-password-error');
+    if(!global.deleteFile) {
+      error.innerHTML = "未选中任何文件"
+      return ;
+    }
+    let input = document.getElementById('password-input');
+    if(!input.value || input.value === '') {
+      error.innerHTML = "请输入密码"
+      return ;
+    }
+    let xhr = new XMLHttpRequest();
+    xhr.open('POST', '/remove', false);
+    xhr.setRequestHeader("content-type", "application/json");
+    xhr.send(JSON.stringify({name:global.deleteFile, password: input.value})); 
+    
+    if(xhr.status === 200) {
+        let res = JSON.parse(xhr.responseText);
+        if(res.success) {
+            let removePwd = document.getElementById('remove-password-card');
+            removePwd.style.display = 'none';
+            global.deleteFile = null;
+            input.value = ""
+            global.total = global.total - 1;
+            global.pages = Math.ceil(global.total / 10);
+            if(global.pageNum > global.pages) {
+                global.pageNum = global.pages;
+            }
+            refreshFileList(global.pageNum);
+            return ;
+        }
+    }
+    error.innerHTML = "删除失败"
+}
+
+
+function pageMouseover(type) {
+    let pageBtn1 = document.getElementById('file-page-btn-1'); 
+    let pageBtn2 = document.getElementById('file-page-btn-2'); 
+    if(type === 1 && global.pageNum > 1) {
+        pageBtn1.classList.add('button-hover');
+    }
+    if(type === 2 && global.pageNum < global.pages) {
+        pageBtn2.classList.add('button-hover');
+    }
+}
+function pageMouseout() {
+    let pageBtn1 = document.getElementById('file-page-btn-1'); 
+    let pageBtn2 = document.getElementById('file-page-btn-2'); 
+    pageBtn1.classList.remove('button-hover');
+    pageBtn1.classList.remove('button-hover');
+}
+
+function prevPage() {
+    if (global.pageNum > 1) {
+        refreshFileList(global.pageNum-1);
+    }
+}
+function nextPage() {
+    if (global.pageNum < global.pages) {
+        refreshFileList(global.pageNum+1);
+    }
+}
+
+window.global = global;
+window.onload = (e) => {
+    refreshFileList(1);
+};
+</script>
+<style scoped>
+html, body {
+  height: calc(100% - 10px);
+  margin: 0px;
+}
+.File {
+  margin: 0 auto;
+  background-color: #ffffff;
+  /* box-shadow: 0px 3px 0px 3px rgba(0, 0, 0, 0.1); */
+  box-shadow: 0 20px 60px rgba(0, 20, 40, 0.08), 0 8px 24px rgba(0, 0, 0, 0.04);
+  transition: transform 0.3s ease;
+  display: block;
+  padding: 30px;
+  height: 100%;
+  max-width: 900px;
+}
+.file-btn {
+  font-size: 18px;
+  padding: 6px 12px;
+  background: #1e88e5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.file-btn:hover {
+  background: #1565c0;
+}
+.upload-btn:hover {
+  background-color: #94c8fd;
+}
+
+.modal-file-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  display: none;
+}
+
+.modal-file-content {
+  background-color: white;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.modal-file-header {
+  padding: 0px 30px;
+  padding-top: 30px;
+  font-size: 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+}
+.close-btn:hover {
+  color: #f11414;
+}
+
+.file-upload-dropzone {
+  border: 2px dashed #ccc;
+  border-radius: 6px;
+  margin: 30px;
+  text-align: center;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+.file-upload-dropzone:hover {
+  border-color: #a0b8d4;
+  background: #f5f9ff;
+}
+.file-upload-dropzone.file-upload-activedropzon {
+  border-color: #409eff;
+  background-color: rgba(64, 158, 255, 0.05);
+}
+.file-upload-displaydropzone {
+  display: none;
+}
+
+.file-upload-dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 180px;
+}
+
+.upload-icon {
+  margin-top: 50px;
+  width: 48px;
+  height: 48px;
+  fill: #409eff;
+}
+
+.file-input {
+  display: none;
+}
+
+.file-data {
+  margin: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  width: 100%;
+  display: inline-flex;
+}
+
+.file-info {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  width: 70%;
+  margin-left: 30px;
+}
+
+.file-name {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.file-size {
+  font-size: 12px;
+  color: #999;
+}
+
+.remove-btn {
+  width: 30%;
+  background: none;
+  border: none;
+  color: #fa3434;
+  font-size: 18px;
+  cursor: pointer;
+  text-align: right;
+  margin-right: 40px;
+}
+
+.modal-file-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.cancel-btn {
+  padding: 8px 16px;
+  background-color: #f4f4f5;
+  color: #606266;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.upload-btn {
+  padding: 8px 16px;
+  background: #1e88e5;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.upload-btn:hover {
+  background: #1565c0;
+}
+
+.upload-btn:disabled {
+  background-color: #a0cfff;
+  cursor: not-allowed;
+}
+
+.file-upload-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    opacity: 0.2;
+    background-color: #e4e4e4;
+    z-index: 1000;
+    .el-loading-spinner {
+        margin-top: 20%;
+    }
+}
+.file-head {
+  display: flex;
+}
+.file-title {
+  text-align: left;
+  font-size: 24px;
+  font-weight: 600;
+  height: 36px;
+  width: 120px;
+  line-height: 36px;
+  margin-left: 20px;
+}
+.file-upload {
+  height: 36px;
+  width: calc(100% - 80px);
+  text-align: right;
+  margin-right: 20px;
+}
+.file-area {
+  position: relative;
+  margin-left: 20px;
+  margin-right: 20px;
+  margin-top: 10px;
+  height: 75%;
+}
+
+.file-list-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  .el-loading-spinner {
+    text-align: center;
+    margin-top: 100px;
+  }
+}
+.list-title {
+  display: flex;
+  justify-content: center;
+  font-size: 18px;
+  border-bottom: 1px solid #bcbcbc;
+  background-color:  #f1f9ff;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  height: 36px;
+}
+.title-content {
+  padding-top: 4px;
+  vertical-align: middle;
+  margin-right: 10px;
+}
+.file-list {
+  display: block;
+  max-height: 400px;
+  overflow-y: auto;
+  min-height: 40px;
+}
+.list-content {
+  display: flex;
+  justify-content: center;
+  color: #585858;
+  font-size: 16px;
+  height: 36px;
+  border-bottom: 1px solid #f3f3f3;
+}
+.list-content:hover {
+  background-color:  #f1f9ff;
+}
+.item-content {
+  padding-top: 10px;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 10px;
+}
+.filename {
+  text-align: left;
+  width: 220px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+.name-content {
+  width: 230px;
+}
+.filename-item {
+  display: inline-block;
+  color: rgb(0, 0, 238);
+  text-decoration-line: underline;
+  max-width: 80%;
+}
+.filename-item:hover {
+  color: #75a1ed;
+  cursor: pointer;
+}
+.fileurl {
+  text-align: center;
+  width: 280px;
+}
+a {
+  color: rgb(0, 0, 238);
+}
+a:hover {
+  color: #75a1ed;
+}
+.filetime {
+  text-align: center;
+  width: 140px;
+}
+.time-content {
+  font-size: 14px;
+  display: flex;
+  align-items: flex-end; 
+  padding-bottom: 4px;
+}
+.fileaction {
+  text-align: center;
+  width: 40px;
+  margin-right: 8px;
+}
+.filedelete {
+  color: #0a46ae;
+  text-align: center;
+  width: 40px;
+  margin-right: 8px;
+  text-decoration: underline;
+}
+.filedelete:hover {
+  color: #75a1ed;
+  cursor: pointer;
+}
+
+.file-page {
+  justify-content: flex-end;
+  margin-top: 20px;
+  text-align: right;
+  height: 32px;
+  width: 100%;
+  margin-right: 10px;
+  font-size: 14px;
+}
+
+.file-page-btn {
+  background-color: white;
+  margin-left: 5px;
+  margin-right: 5px;
+  border: 0px;
+  text-decoration: underline;
+}
+.file-page-btn:disabled {
+  color: light-dark(rgba(16, 16, 16, 0.3), rgba(255, 255, 255, 0.3));
+}
+.button-hover {
+  color: #0a46ae;
+  cursor: pointer;
+}
+
+@keyframes fadeInBg {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* 弹窗卡片 */
+.remove-password-card {
+    display: none;
+    position: fixed;
+    top: calc(50% - 180px);
+    left: calc(50% - 200px);
+    background: white;
+    width: 400px;
+    height: 180px;
+    border-radius: 8px;
+    box-shadow: 0 30px 50px rgba(0,0,0,0.3);
+    animation: slideUpModal 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+    overflow: hidden;
+}
+
+@keyframes slideUpModal {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.remove-password-body {
+    padding: 1.5rem 1.8rem 1.8rem 1.8rem;
+}
+
+.remove-password-input {
+    margin-bottom: 8px;
+}
+
+.remove-password-input label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #0f172a;
+    font-size: 0.9rem;
+}
+
+.remove-password-wrapper {
+    display: flex;
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    transition: 0.2s;
+    padding: 0.2rem 0.6rem;
+}
+
+.remove-password-wrapper:focus-within {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+    background: white;
+}
+
+.remove-password-wrapper input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 0.9rem 0.5rem;
+    font-size: 1rem;
+    outline: none;
+    width: 100%;
+}
+
+.toggle-pwd {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 0.5rem;
+    font-size: 1rem;
+    color: #5b6e8c;
+    font-weight: 500;
+    transition: 0.2s;
+}
+
+.toggle-pwd:hover {
+    color: #3b82f6;
+}
+
+.remove-password-error {
+    font-size: 12px;
+    padding: 0px 20px;
+    color: #e11d48;
+    height: 18px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.remove-password-actions {
+    display: flex;
+    gap: 0.9rem;
+    margin-top: 1rem;
+    justify-content: flex-end;
+}
+
+.remove-password-actions button {
+    padding: 0.7rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.remove-password-confirm {
+    background: #3b82f6;
+    color: white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.remove-password-confirm:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+}
+
+.remove-password-cancel {
+    background: #f1f5f9;
+    color: #334155;
+}
+
+.remove-password-cancel:hover {
+    background: #e2e8f0;
+}
+
+hr {
+    margin: 1rem 0;
+    border: none;
+    border-top: 1px solid #eef2f6;
+}
+
+footer {
+    text-align: center;
+    font-size: 0.7rem;
+    color: #62748c;
+    padding: 1rem;
+}
+</style>
+
+</body>
+</html>
