@@ -364,7 +364,6 @@ function showDeletePanel(name) {
             if(res.success) {
                 deleteEl.display = 'none';
                 input.value = ""
-                hideDeletePanel();
                 refreshFileList();
                 return ;
             }
@@ -396,19 +395,11 @@ function refreshFileList() {
     let fileList = document.getElementById('file-list');  
     let html = "", i = 0, fUrl = '', fName = '';
     for(let f of data.files) {
-        fName = truncateByCanvas(f.name, 750, 64);
-        let size = '0 B';
-        if(f.size > 0) {
-          let sizes = ['B', 'KB', 'MB', 'GB'], i = Math.floor(Math.log(f.size) / Math.log(1024))
-          size = parseFloat((f.size / Math.pow(1024, i)).toFixed(2)) + ' ' + sizes[i]
-        }
+        fName = truncateByCanvas(f.name, 800, 64);
         html += `
         <div style="margin-bottom: 20px; background-color: white; border-radius: 16px; padding: 10px 30px;">
             <div style="font-size: 64px; font-weight: 600; font-family:Arial, Helvetica, sans-serif; color: #3787e8; cursor:pointer" onclick="showFileByUrl('/${f.url}')">${fName}</div>
-            <div style="display: flex;width: 100%;border-bottom: 2px solid #d8d8d8;">
-            <div style="font-size: 36px;color: darkgrey;display: flex; align-items: flex-end;width: 50%;">${f.time}</div>
-            <div style="font-size: 36px;color: darkgrey;display: flex; align-items: flex-end;width: 50%;">${size}</div>
-            </div>
+            <div style="font-size: 36px;color: darkgrey;display: flex; align-items: flex-end;width: 100%;border-bottom: 2px solid #d8d8d8;">${f.time}</div>
             <div style="display: flex;justify-content: space-between; margin-top: 10px;">
                 <div style="display:flex;width: 50%;color: #3787e8; cursor:pointer;height:100px;justify-content: center;align-items: center;" onclick="downloadFileByName('${f.name}')">
                     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
