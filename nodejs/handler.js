@@ -117,12 +117,12 @@ function handleStaticDirectory(res, headers, dir) {
  * @param {ServerResponse} res
 */
 function handleStaticFile(res, headers, file, fileName, icon) {
-    let suffixIdx = fileName.lastIndexOf(".");
     if(fileName.startsWith('/')) {
-        fileName = fileName.substring(1);
+        fileName = fileName.substring(1, fileName.length);
     }
+    let suffixIdx = fileName.lastIndexOf(".");
     if(suffixIdx > 0) {
-        let suffix = fileName.substring(suffixIdx);
+        let suffix = fileName.substring(suffixIdx, fileName.length);
         if(suffix === ".docx") {
             headers["Content-Type"] = "text/html";
             res.writeHead(200, headers);
