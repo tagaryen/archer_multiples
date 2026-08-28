@@ -348,6 +348,7 @@ async function httpHandler(req, res) {
             res.end(getIndexHtml(isMobile));
             return ;
         }
+        url = decodeURI(url);
         if(method === "GET" && (url === '/ico' || url === '/favicon.ico')) {
             headers["Content-Type"] = "application/x-ico";
             res.writeHead(200, headers);
@@ -374,7 +375,25 @@ async function httpHandler(req, res) {
             handleNpmjs(req, res, headers, url);
             return ;
         }
-        url = decodeURI(url);
+        if(method === "GET" && (url.startsWith("/video/"))) {
+            let file = local + url.substring(6);
+            if(!fs.existsSync(file)) {
+                headers["Content-Type"] = "text/html";
+                res.writeHead(200, headers);
+                res.end(get404Html());
+                return ;
+            }
+            let contentType = getContentType(file);
+            if(!contentType) {
+                contentType = "application/octet-stream";
+                headers["Content-Disposition"] = "attachment; filename=" + fileName;
+            } else {
+                headers["Content-Type"] = contentType;
+            }
+            res.writeHead(200, headers);
+            fs.createReadStream(file).pipe(res);
+            return ;
+        }
         console.log("Request -url:'" + url + "', -referer = " + req.headers.referer)
         if(req.headers.referer) {
             let referer = decodeURI(req.headers.referer);
