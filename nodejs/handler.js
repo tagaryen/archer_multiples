@@ -81,9 +81,8 @@ const contentTypes = {
 };
 
 function get404Html() {
-    let notFound = html.notFound;
-    notFound = notFound.replace('$(icon_template)', "ico");
-    return Buffer.from(notFound);
+    let notFound = html.notFound.replace('$(time)', (new Date()).toLocaleString());
+    return Buffer.from(notFound, 'utf-8');
 }
 function getContentType(name) {
     let dot = name.lastIndexOf('.');
@@ -162,6 +161,7 @@ function handleStaticFile(res, headers, file, fileName, icon) {
 }
 
 module.exports = {
+    get404Html,
     handleStaticDirectory,
     handleStaticFile,
     contentTypes,

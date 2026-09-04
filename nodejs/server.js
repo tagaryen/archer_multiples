@@ -7,11 +7,15 @@ const local = rootDir + "/files";
 const staticPath = local + "/static"
 const multipartPath = local + "/multipart"
 const { exit } = require('process');
-const multiparty = require('multiparty');
-const zl = require("zip-lib");
-const { handleStaticDirectory, handleStaticFile, contentTypes, getContentType} = require("./handler");
-const {indexHtml,notFound,icon} = require('./html')
+const {parseMultipart} = require("./multipart");
+const { compressFile,decompressFile } = require("./zip");
+const { get404Html, handleStaticDirectory, handleStaticFile, contentTypes, getContentType} = require("./handler");
+const {notFound,icon} = require('./html')
 const {docxJs, jzipJs, excelJs, xlsxJs, markdJs, hljsCss, highlightJs} = require('./npmjs');
+
+const mobileHtml = Buffer.from(fs.readFileSync(rootDir + "/mobileIndex.html", 'utf-8'));
+const indexHtml = Buffer.from(fs.readFileSync(rootDir + "/index.html", 'utf-8'));
+
 
 let serverPort = 9607;
 let referMap = {};
@@ -62,15 +66,10 @@ function delFiles(dir) {
 }
 function getIndexHtml(isMobile) {
     if(isMobile) {
-        // return Buffer.from(indexHtml, 'base64');
-        return Buffer.from(fs.readFileSync(rootDir + "/mobileIndex.html", 'utf-8'));
+        return mobileHtml
     } else {
-        // return Buffer.from(indexHtml, 'base64');
-        return Buffer.from(fs.readFileSync(rootDir + "/index.html", 'utf-8'));
+        return indexHtml
     }
-}
-function get404Html() {
-    return Buffer.from(notFound, 'utf-8');
 }
 /**
  * @param {http.IncomingMessage} req
@@ -190,8 +189,8 @@ function handleDownload(req, res, headers) {
  * @param {http.ServerResponse} res
 */
 function handleUpload(req, res, headers) {
-    let form = new multiparty.Form({uploadDir: multipartPath});
-    form.parse(req, (error, fields, files) => {
+    // let form = new multiparty.Form({uploadDir: multipartPath});
+    parseMultipart(req, multipartPath, (error, fields, files) => {
         let body = {
             success : false,
             message : "上传失败"
@@ -214,15 +213,14 @@ function handleUpload(req, res, headers) {
                         if(fileName.endsWith(".zip")) {
                             let staticDir = staticPath + "/" + fileName.substring(0, fileName.length - 4);
                             fs.mkdirSync(staticDir, {recursive: true});
-                            zl.extract(filePath, staticDir).then(() => {
-                                let childs = fs.readdirSync(staticDir);
-                                if(childs.length === 1 && fs.statSync(staticDir + "/" + childs[0]).isDirectory()) {
-                                    fs.readdirSync(staticDir + "/" + childs[0]).map(c => {
-                                        fs.renameSync(staticDir + "/" + childs[0] + "/" + c, staticDir + "/" + c);
-                                    });
-                                    fs.rmdirSync(staticDir + "/" + childs[0]);
-                                }
-                            });
+                            decompressFile(filePath, staticDir);
+                            let childs = fs.readdirSync(staticDir);
+                            if(childs.length === 1 && fs.statSync(staticDir + "/" + childs[0]).isDirectory()) {
+                                fs.readdirSync(staticDir + "/" + childs[0]).map(c => {
+                                    fs.renameSync(staticDir + "/" + childs[0] + "/" + c, staticDir + "/" + c);
+                                });
+                                fs.rmdirSync(staticDir + "/" + childs[0]);
+                            }
                         }
                         body.success = true;
                         body.message = "success"
