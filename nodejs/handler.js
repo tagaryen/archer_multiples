@@ -3,6 +3,7 @@ const handleImageHtml = require("./img");
 const handleTextHtml = require("./text");
 const handleDocxHtml = require("./docx");
 const handleXlsxHtml = require("./xlsx");
+const handleVideoHtml = require("./video");
 
 const fs = require('fs');
 const html = require('./html');
@@ -76,8 +77,7 @@ const contentTypes = {
   '.mpg': 'video/mpeg',
   '.avi': 'video/x-msvideo',
   '.mov': 'video/quicktime',
-  '.webm': 'video/webm',
-  '.mkv': 'video/mkv',
+  '.webm': 'video/webm'
 };
 
 function get404Html() {
@@ -92,7 +92,7 @@ function getContentType(name) {
     let tail = name.substring(dot);
     let contentType = contentTypes[tail];
     if(!contentType) {
-        contentType = "text/plain";
+        contentType = "application/octet-stream";
     }
     return contentType;
 }
@@ -116,12 +116,12 @@ function handleStaticDirectory(res, headers, dir) {
  * @param {ServerResponse} res
 */
 function handleStaticFile(res, headers, file, fileName, icon) {
-    let suffixIdx = fileName.lastIndexOf(".");
     if(fileName.startsWith('/')) {
-        fileName = fileName.substring(1);
+        fileName = fileName.substring(1, fileName.length);
     }
+    let suffixIdx = fileName.lastIndexOf(".");
     if(suffixIdx > 0) {
-        let suffix = fileName.substring(suffixIdx);
+        let suffix = fileName.substring(suffixIdx, fileName.length);
         if(suffix === ".docx") {
             headers["Content-Type"] = "text/html";
             res.writeHead(200, headers);
@@ -137,6 +137,12 @@ function handleStaticFile(res, headers, file, fileName, icon) {
     }
 
     let contentType = getContentType(fileName);
+    if(contentType.startsWith("video/")) {
+        headers["Content-Type"] = "text/html";
+        res.writeHead(200, headers);
+        res.end(Buffer.from(handleVideoHtml(fileName, icon, contentType, fileName)));
+        return ;
+    }
     if(contentType === "text/markdown") {
         headers["Content-Type"] = "text/html";
         res.writeHead(200, headers);
