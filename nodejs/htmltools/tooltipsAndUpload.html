@@ -8,9 +8,9 @@
 <div id="tips" style="position: absolute; top: 60px; left: 200px; width: 120px; height: 50px; font-size: 14px; color: #edebeb; background-color: #557df5; border-radius: 4px; text-align: center; line-height: 20px; cursor: pointer;" data-tooltip="鼠标移至此处显示提示信息">
     鼠标移至此处显示提示信息,点击上传
 </div>
-<script src="./tooltips.js"></script>
-<script src="./uploadWindow.js"></script>
 <script type="module">
+import { drawToolTips, removeToolTips } from './tooltips.js';
+import { drawUploadWindow, updateProgress, finishAndCloseUploadWindow } from './uploadWindow.js';
 window.onload = function() {
     document.getElementById('tips').addEventListener('mouseover', function() {
         drawToolTips("底部提示", {side:'bottom', left: 220, top: 120, backgroundColor: '#adadad'});

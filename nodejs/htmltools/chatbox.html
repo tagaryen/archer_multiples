@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nova AI · 智能对话体验中心</title>
+<style>
+  :root {
+    --bg: #070a14;
+    --bg-soft: #0b1020;
+    --card: rgba(255, 255, 255, 0.045);
+    --card-border: rgba(255, 255, 255, 0.09);
+    --text: #e8eaf2;
+    --text-dim: rgba(232, 234, 242, 0.6);
+    --text-faint: rgba(232, 234, 242, 0.38);
+    --accent1: #6366f1;
+    --accent2: #22d3ee;
+    --accent3: #f472b6;
+    --grad: linear-gradient(135deg, #6366f1, #22d3ee);
+    --radius: 18px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  section { position: relative; }
+  .container { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- 背景装饰 ---------- */
+  .aurora { position: fixed; inset: 0; z-index: -2; overflow: hidden; }
+  .aurora::before {
+    content: "";
+    position: absolute;
+    top: -40%; left: -20%;
+    width: 70vw; height: 70vw;
+    background: radial-gradient(circle, rgba(99, 102, 241, 0.16), transparent 62%);
+    animation: drift1 26s ease-in-out infinite alternate;
+  }
+  .aurora::after {
+    content: "";
+    position: absolute;
+    bottom: -30%; right: -25%;
+    width: 65vw; height: 65vw;
+    background: radial-gradient(circle, rgba(34, 211, 238, 0.13), transparent 62%);
+    animation: drift2 32s ease-in-out infinite alternate;
+  }
+  @keyframes drift1 { to { transform: translate(12%, 8%) scale(1.15); } }
+  @keyframes drift2 { to { transform: translate(-10%, -12%) scale(1.1); } }
+  .grid-overlay {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
+  }
+
+  /* ---------- 导航 ---------- */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    background: rgba(7, 10, 20, 0.62);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .nav-inner {
+    max-width: 1160px; margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; gap: 36px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 800; }
+  .logo-badge {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: var(--grad);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; color: #fff;
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+  }
+  .nav-links { display: flex; gap: 26px; font-size: 14px; color: var(--text-dim); margin-left: auto; }
+  .nav-links a { transition: color 0.2s; }
+  .nav-links a:hover { color: #fff; }
+  .nav-cta {
+    padding: 9px 20px; border-radius: 999px;
+    background: var(--grad); color: #fff;
+    font-size: 13.5px; font-weight: 600;
+    border: none; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.4);
+    transition: transform 0.2s, filter 0.2s;
+  }
+  .nav-cta:hover { transform: translateY(-1px); filter: brightness(1.1); }
+
+  /* ---------- Hero ---------- */
+  .hero { padding: 170px 0 90px; text-align: center; }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 18px; border-radius: 999px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    color: #b4b8ff; font-size: 13px;
+    margin-bottom: 28px;
+  }
+  .hero-badge .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #34d399; box-shadow: 0 0 8px #34d399;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  .hero h1 {
+    font-size: clamp(38px, 6vw, 68px);
+    font-weight: 800; line-height: 1.18; letter-spacing: -1px;
+  }
+  .hero h1 .grad-text {
+    background: linear-gradient(120deg, #818cf8, #22d3ee 55%, #f472b6);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p {
+    max-width: 640px; margin: 24px auto 0;
+    font-size: 17px; color: var(--text-dim);
+  }
+  .hero-actions { margin-top: 40px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    padding: 14px 32px; border-radius: 14px; font-size: 15px; font-weight: 600;
+    cursor: pointer; border: none; transition: transform 0.2s, filter 0.2s, background 0.2s;
+  }
+  .btn-primary {
+    background: var(--grad); color: #fff;
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.45);
+  }
+  .btn-primary:hover { transform: translateY(-2px); filter: brightness(1.1); }
+  .btn-ghost {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: var(--text);
+  }
+  .btn-ghost:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-2px); }
+
+  /* Hero 统计 */
+  .hero-stats {
+    display: flex; justify-content: center; gap: clamp(24px, 6vw, 80px);
+    margin-top: 76px; flex-wrap: wrap;
+  }
+  .stat { text-align: center; }
+  .stat-value {
+    font-size: clamp(28px, 4vw, 40px); font-weight: 800;
+    background: linear-gradient(120deg, #818cf8, #22d3ee);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .stat-label { font-size: 13px; color: var(--text-faint); margin-top: 4px; }
+
+  /* ---------- 通用 section ---------- */
+  .section { padding: 100px 0; }
+  .section-head { text-align: center; margin-bottom: 56px; }
+  .section-tag {
+    display: inline-block; font-size: 12.5px; font-weight: 600;
+    letter-spacing: 3px; color: var(--accent2);
+    text-transform: uppercase; margin-bottom: 14px;
+  }
+  .section-title { font-size: clamp(26px, 3.6vw, 38px); font-weight: 800; letter-spacing: -0.5px; }
+  .section-desc { color: var(--text-dim); max-width: 560px; margin: 14px auto 0; font-size: 15.5px; }
+
+  /* ---------- 特性卡片 ---------- */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 22px;
+  }
+  .feature-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 30px 26px;
+    transition: transform 0.3s, border-color 0.3s, background 0.3s;
+    position: relative; overflow: hidden;
+  }
+  .feature-card::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), rgba(99, 102, 241, 0.12), transparent 65%);
+    opacity: 0; transition: opacity 0.35s;
+  }
+  .feature-card:hover { transform: translateY(-6px); border-color: rgba(99, 102, 241, 0.4); }
+  .feature-card:hover::before { opacity: 1; }
+  .feature-icon {
+    width: 52px; height: 52px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; margin-bottom: 18px;
+    background: rgba(99, 102, 241, 0.14);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+  }
+  .feature-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .feature-card p { font-size: 14px; color: var(--text-dim); }
+
+  /* ---------- 工作流 ---------- */
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 20px; }
+  .step {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--radius); padding: 28px 24px; position: relative;
+  }
+  .step-num {
+    font-size: 44px; font-weight: 800; line-height: 1;
+    background: linear-gradient(120deg, rgba(129, 140, 248, 0.9), rgba(34, 211, 238, 0.35));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    margin-bottom: 14px;
+  }
+  .step h3 { font-size: 16.5px; font-weight: 700; margin-bottom: 6px; }
+  .step p { font-size: 13.5px; color: var(--text-dim); }
+  .step-arrow { position: absolute; right: -16px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.2); font-size: 20px; }
+
+  /* ---------- 代码展示 ---------- */
+  .code-window {
+    background: #0a0e1a;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  }
+  .code-titlebar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 13px 18px; background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--card-border);
+  }
+  .code-titlebar .c { width: 12px; height: 12px; border-radius: 50%; }
+  .c-red { background: #ff5f57; } .c-yellow { background: #febc2e; } .c-green { background: #28c840; }
+  .code-titlebar .filename { margin-left: 12px; font-size: 12.5px; color: var(--text-faint); font-family: Consolas, monospace; }
+  .code-window pre {
+    padding: 24px 26px; overflow-x: auto;
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-size: 13.5px; line-height: 1.85; color: #c9d4f5;
+  }
+  .tok-kw { color: #c792ea; } .tok-str { color: #a5f3c8; }
+  .tok-cm { color: rgba(140, 150, 180, 0.55); } .tok-fn { color: #82aaff; }
+
+  /* ---------- 用户评价 ---------- */
+  .quotes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; }
+  .quote-card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: var(--radius); padding: 28px 26px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .quote-stars { color: #fbbf24; font-size: 15px; letter-spacing: 3px; }
+  .quote-card blockquote { font-size: 14.5px; color: var(--text-dim); font-style: italic; }
+  .quote-user { display: flex; align-items: center; gap: 12px; margin-top: auto; }
+  .quote-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px; color: #fff;
+  }
+  .quote-user .name { font-size: 14px; font-weight: 600; }
+  .quote-user .role { font-size: 12px; color: var(--text-faint); }
+
+  /* ---------- CTA ---------- */
+  .cta-banner {
+    background:
+      linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(34, 211, 238, 0.18)),
+      var(--bg-soft);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    border-radius: 26px;
+    padding: 70px 40px; text-align: center;
+  }
+  .cta-banner h2 { font-size: clamp(24px, 3.4vw, 36px); font-weight: 800; margin-bottom: 14px; }
+  .cta-banner p { color: var(--text-dim); margin-bottom: 32px; }
+
+  /* ---------- 页脚 ---------- */
+  footer { border-top: 1px solid rgba(255, 255, 255, 0.07); padding: 44px 0; margin-top: 60px; }
+  .footer-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px; color: var(--text-faint); font-size: 13.5px;
+  }
+
+  /* ---------- 滚动入场动画 ---------- */
+  .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .reveal.visible { opacity: 1; transform: none; }
+
+  @media (max-width: 720px) {
+    .nav-links { display: none; }
+    .hero { padding-top: 130px; }
+    .step-arrow { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="aurora"></div>
+<div class="grid-overlay"></div>
+
+<!-- 导航 -->
+<nav>
+  <div class="nav-inner">
+    <div class="logo"><div class="logo-badge">✦</div>Nova AI</div>
+    <div class="nav-links">
+      <a href="#features">核心能力</a>
+      <a href="#workflow">工作原理</a>
+      <a href="#integration">快速接入</a>
+      <a href="#voices">用户评价</a>
+    </div>
+    <button class="nav-cta" id="nav-open-aibox">💬 与 AI 对话</button>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge"><span class="dot"></span>Nova Engine v2.0 正式发布</div>
+    <h1>为每一次对话<br/><span class="grad-text">注入真正的智能</span></h1>
+    <p>
+      Nova AI 将大模型推理、工具调用与流式输出融合为一个轻量组件，
+      右下角的对话助手已经就绪 —— 试试与它交流，或让它为你调用工具。
+    </p>
+    <div class="hero-actions">
+      <button class="btn btn-primary" id="hero-open-aibox">🚀 立即开始对话</button>
+      <a class="btn btn-ghost" href="#features">了解更多</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-value" data-count="98">0</div><div class="stat-label">响应满意度 %</div></div>
+      <div class="stat"><div class="stat-value" data-count="1200">0</div><div class="stat-label">企业客户 +</div></div>
+      <div class="stat"><div class="stat-value" data-count="50">0</div><div class="stat-label">毫秒级首字延迟</div></div>
+      <div class="stat"><div class="stat-value" data-count="99">0</div><div class="stat-label">服务可用性 %</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 核心能力 -->
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-tag">Capabilities</div>
+      <h2 class="section-title">核心能力</h2>
+      <p class="section-desc">从流式对话到工具编排，为现代 Web 应用提供完整的智能交互基座。</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">🧠</div>
+        <h3>智能问答</h3>
+        <p>基于先进大模型的多轮对话能力，理解上下文、精准推理，回答专业且自然。</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🔧</div>
+        <h3>工具调用</h3>
+        <p>原生支持 Function Calling，模型可自主决策并调用外部工具，过程全程可见。</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">⚡</div>
+        <h3>流式输出</h3>
+        <p>SSE 逐字渲染，首字毫秒级到达，配合光标动画带来丝滑的对话体验。</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🧩</div>
+        <h3>零依赖嵌入</h3>
+        <p>纯原生实现，一行代码挂载到任意页面，样式隔离，不侵入宿主应用。</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">📐</div>
+        <h3>自适应布局</h3>
+        <p>桌面端悬浮卡片、移动端全屏适配，靠右侧一键隐藏与呼出，交互自然。</p>
+      </div>
+      <div class="feature-card reveal">
+        <div class="feature-icon">🔐</div>
+        <h3>安全可控</h3>
+        <p>密钥仅保存在客户端本地，请求直连模型服务，中间链路零留存。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 工作原理 -->
+<section class="section" id="workflow">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-tag">Workflow</div>
+      <h2 class="section-title">一次对话的旅程</h2>
+      <p class="section-desc">从用户输入到最终回答，四步完成一次完整的智能交互。</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-num">01</div>
+        <h3>理解意图</h3>
+        <p>用户在对话框输入请求，会话上下文与系统提示词一同送入模型。</p>
+        <span class="step-arrow">›</span>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">02</div>
+        <h3>决策调用</h3>
+        <p>模型判断是否需要借助工具，生成结构化的调用参数。</p>
+        <span class="step-arrow">›</span>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">03</div>
+        <h3>执行工具</h3>
+        <p>沙箱内执行工具函数，结果实时回传并展示调用过程。</p>
+        <span class="step-arrow">›</span>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">04</div>
+        <h3>流式作答</h3>
+        <p>模型整合所有上下文，逐字生成最终回答，渲染为富文本。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 快速接入 -->
+<section class="section" id="integration">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-tag">Integration</div>
+      <h2 class="section-title">一行代码，接入智能</h2>
+      <p class="section-desc">大模型参数自行输入，AIBox 不绑定任何具体实现。</p>
+    </div>
+    <div class="code-window reveal">
+      <div class="code-titlebar">
+        <span class="c c-red"></span><span class="c c-yellow"></span><span class="c c-green"></span>
+        <span class="filename">your-page.html</span>
+      </div>
+<pre><span class="tok-kw">import</span> { ChatBox } <span class="tok-kw">from</span> <span class="tok-str">'./aibox.js'</span>;
+
+<span class="tok-cm">// 创建客户端（填入你的模型服务信息）</span>
+<span class="tok-kw">const</span> chatBox = <span class="tok-kw">new</span> <span class="tok-fn">ChatBox</span>({
+  baseUrl: <span class="tok-str">''</span>, <span class="tok-cm">// 输入你的模型接口</span>
+  apiKey: <span class="tok-str">''</span>,  <span class="tok-cm">// 输入你的模型key</span>
+  model: <span class="tok-str">''</span>,   <span class="tok-cm">// 输入你的模型id</span>
+  tools: [randomDice],
+});</pre>
+    </div>
+  </div>
+</section>
+
+<!-- 用户评价 -->
+<section class="section" id="voices">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-tag">Voices</div>
+      <h2 class="section-title">他们正在使用</h2>
+    </div>
+    <div class="quotes">
+      <div class="quote-card reveal">
+        <div class="quote-stars">★★★★★</div>
+        <blockquote>“右下角的小助手几乎零成本地融入了我们的控制台，用户咨询量下降了四成。”</blockquote>
+        <div class="quote-user">
+          <div class="quote-avatar" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)">林</div>
+          <div><div class="name">林然</div><div class="role">SaaS 平台负责人</div></div>
+        </div>
+      </div>
+      <div class="quote-card reveal">
+        <div class="quote-stars">★★★★★</div>
+        <blockquote>“工具调用过程可视化做得很棒，调试 Agent 流程时一目了然，省了大量时间。”</blockquote>
+        <div class="quote-user">
+          <div class="quote-avatar" style="background:linear-gradient(135deg,#22d3ee,#0ea5e9)">陈</div>
+          <div><div class="name">陈墨</div><div class="role">全栈工程师</div></div>
+        </div>
+      </div>
+      <div class="quote-card reveal">
+        <div class="quote-stars">★★★★★</div>
+        <blockquote>“流式输出的体验非常顺滑，靠右隐藏的设计让它在内容型网站里毫不突兀。”</blockquote>
+        <div class="quote-user">
+          <div class="quote-avatar" style="background:linear-gradient(135deg,#f472b6,#fb923c)">苏</div>
+          <div><div class="name">苏晓</div><div class="role">产品设计师</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section">
+  <div class="container">
+    <div class="cta-banner reveal">
+      <h2>准备好开启智能对话了吗？</h2>
+      <p>助手就在右下角等你，随时隐藏、随时呼出。</p>
+      <button class="btn btn-primary" id="cta-open-aibox">💬 唤醒 AI 助手</button>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container footer-inner">
+    <div>© 2026 Nova AI · 智能对话体验中心</div>
+    <div>Crafted with ♡ for developers</div>
+  </div>
+</footer>
+
+<script type="module">
+  import {ChatBox, AgentSession} from './cahtbox.js';
+
+  const CONFIG = {	
+    baseUrl: "http://127.0.0.1:987",
+    apiKey: "askcmsakcmakc",
+    model: 'modelId',
+  };
+
+  /* ---------------- Tools 演示 ---------------- */
+  const randomDice = {
+    name: 'random_dice',
+    description: '掷一个骰子并返回点数',
+    parameters: {
+      type: 'object',
+      properties: { sides: { type: 'number', description: '骰子面数，默认 6' } },
+    },
+    invoke: ({ sides = 6 }) => `掷出了 ${Math.floor(Math.random() * sides) + 1} 点（${sides} 面骰）`,
+  };
+
+  /* ---------------- Mock 客户端（未配置 API Key 时使用） ---------------- */
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const box = new ChatBox({
+    ...CONFIG,
+    tools: [randomDice],
+    title: 'Nova AI 助手',
+    subtitle: CONFIG.baseUrl && CONFIG.apiKey ? CONFIG.model + ' · 在线' : '演示模式 · 在线',
+    darkMode: true
+  });
+
+  // 页面上的 CTA 按钮也可呼出对话框
+  ['nav-open-aibox', 'hero-open-aibox', 'cta-open-aibox'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('click', () => box.show());
+  });
+
+  /* ---------------- 页面动效：滚动入场 + 数字滚动 ---------------- */
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('visible');
+      io.unobserve(e.target);
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+
+  const counterIO = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      counterIO.unobserve(e.target);
+      const target = +e.target.dataset.count;
+      const start = performance.now();
+      const tick = (t) => {
+        const p = Math.min((t - start) / 1400, 1);
+        e.target.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))).toLocaleString();
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  }, { threshold: 0.5 });
+  document.querySelectorAll('.stat-value').forEach((el) => counterIO.observe(el));
+
+  // 特性卡片鼠标跟随光晕
+  document.querySelectorAll('.feature-card').forEach((card) => {
+    card.addEventListener('mousemove', (e) => {
+      const r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      card.style.setProperty('--my', `${e.clientY - r.top}px`);
+    });
+  });
+</script>
+</body>
+</html>

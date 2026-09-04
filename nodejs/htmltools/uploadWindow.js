@@ -317,4 +317,4 @@ function finishAndCloseUploadWindow(options, finishCallback) {
         progressText.textContent = options.content || "失败"
     }
 }
-// export default {drawUploadWindow, updateProgress, finishAndCloseUploadWindow};
+export default {drawUploadWindow, updateProgress, finishAndCloseUploadWindow};

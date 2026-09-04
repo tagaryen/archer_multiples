@@ -115,4 +115,4 @@ function removeToolTips(side) {
     tooltip.style.display = 'none';
   }
 }
-// export default {drawToolTips, removeToolTips};
+export default {drawToolTips, removeToolTips};
