@@ -15,7 +15,7 @@ const {docxJs, jzipJs, excelJs, xlsxJs, markdJs, hljsCss, highlightJs} = require
 
 const mobileHtml = Buffer.from(fs.readFileSync(rootDir + "/mobileIndex.html", 'utf-8'));
 const indexHtml = Buffer.from(fs.readFileSync(rootDir + "/index.html", 'utf-8'));
-
+const maxZipSize = 1024 * 1024 * 512;
 
 let serverPort = 9607;
 let referMap = {};
@@ -119,7 +119,7 @@ function handleList(req, res, headers) {
     for(let f of dirs) {
         let stat = fs.statSync(local + "/" + f);
         let url = f;
-        if(url.endsWith('.zip')) {
+        if(url.endsWith('.zip') && stat.size < maxZipSize) {
             url = url.substring(0, url.length - 4);
         }
         let time = stat.birthtime;
@@ -197,6 +197,7 @@ function handleUpload(req, res, headers) {
         };
         let tmpFile = files.file[0].path;
         let fileName = files.file[0].originalFilename;
+        let fileSize = files.file[0].size;
         if(error) {
             console.error("上传文件失败,", error)
         } else {
@@ -210,7 +211,7 @@ function handleUpload(req, res, headers) {
                         body.message = "名称重复";
                     } else {
                         fs.renameSync(tmpFile, filePath);
-                        if(fileName.endsWith(".zip")) {
+                        if(fileName.endsWith(".zip") && fileSize < maxZipSize) {
                             let staticDir = staticPath + "/" + fileName.substring(0, fileName.length - 4);
                             fs.mkdirSync(staticDir, {recursive: true});
                             decompressFile(filePath, staticDir);

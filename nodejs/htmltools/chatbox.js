@@ -310,7 +310,7 @@ const runJsexpression = {
     if (!/^[\d+\-*/().\s%]+$/.test(expression)) {
       throw new Error('仅支持数字与 + - * / % ( ) 运算符');
     }
-    return `${expression} = ${Function('"use strict"; return (' + expression + ')')()}`;
+    return `${Function('"use strict"; return (' + expression + ')')()}`;
   },
 };
 
@@ -880,4 +880,3 @@ class ChatBox {
 }
 
 export {AgentSession, ChatBox};
-// export default {AgentSession, ChatBox};
