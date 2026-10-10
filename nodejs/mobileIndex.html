@@ -1,31 +1,346 @@
 <!DOCTYPE html>
-<html lang="zh-CN" style="height: 100%;">
+<html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <title>文件存取</title>
-</head>
-<body style="background-color: #e7e5e5; height: 100vh; margin: 0px;">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#5b7cfa">
+<meta name="format-detection" content="telephone=no">
+<title>文件存取 · 移动版</title>
 <style>
-  ::-webkit-scrollbar {
-    width: 0px;
+  :root {
+    --accent: #5b7cfa;
+    --accent-2: #8a5cf6;
+    --accent-soft: #eef2ff;
+    --ink: #171a2b;
+    --ink-2: #454c62;
+    --ink-3: #8b93a7;
+    --line: #e9ecf5;
+    --bg: #f4f6fc;
+    --danger: #e0483d;
+    --grad: linear-gradient(135deg, #5b7cfa 0%, #8a5cf6 100%);
+    --shadow-sm: 0 2px 10px rgba(23,26,43,.06);
+    --shadow-md: 0 10px 30px rgba(23,26,43,.10);
+    --shadow-lg: 0 -14px 60px rgba(23,26,43,.24);
+    --fs-name: clamp(17px, 4.4vw, 30px);
+    --fs-sub: clamp(13px, 3.2vw, 22px);
+    --fs-title: clamp(19px, 5vw, 34px);
+    --fs-btn: clamp(15px, 3.8vw, 26px);
   }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.5;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- app bar ---------- */
+  .appbar {
+    position: relative; z-index: 5;
+    padding: calc(env(safe-area-inset-top) + 14px) 18px 14px;
+    background: var(--grad); color: #fff;
+    box-shadow: 0 8px 26px rgba(91,124,250,.32);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .appbar::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 90% at 88% -20%, rgba(255,255,255,.28), transparent 60%);
+  }
+  .appbar__left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .appbar__logo {
+    width: clamp(38px, 9vw, 62px); height: clamp(38px, 9vw, 62px); border-radius: clamp(12px, 3vw, 20px);
+    background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.32);
+    display: grid; place-items: center; flex: none; backdrop-filter: blur(6px);
+  }
+  .appbar__logo svg { width: 60%; height: 60%; }
+  .appbar__title { min-width: 0; }
+  .appbar__title h1 {
+    margin: 0; font-size: var(--fs-title); font-weight: 700; letter-spacing: .5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .appbar__title p { margin: 2px 0 0; font-size: var(--fs-sub); opacity: .82; letter-spacing: .6px; }
+  .appbar__actions { display: flex; align-items: center; gap: 10px; flex: none; position: relative; z-index: 1; }
+  .fab {
+    width: clamp(44px, 11vw, 76px); height: clamp(44px, 11vw, 76px); border-radius: 50%;
+    background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3);
+    color: #fff; display: grid; place-items: center; cursor: pointer;
+    transition: transform .14s ease, background .14s ease;
+    backdrop-filter: blur(6px);
+  }
+  .fab svg { width: 52%; height: 52%; }
+  .fab:active { transform: scale(.9); background: rgba(255,255,255,.32); }
+  .fab--solid { background: #fff; color: var(--accent); border-color: #fff; box-shadow: 0 8px 22px rgba(0,0,0,.16); }
+  .fab--solid:active { transform: scale(.9); }
+  .fab.spin svg { animation: spin .6s linear; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- stats strip ---------- */
+  .stats {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 18px 4px;
+    font-size: var(--fs-sub); color: var(--ink-3);
+  }
+  .stats b { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stats .dot { width: 6px; height: 6px; border-radius: 50%; background: #3ecf8e; box-shadow: 0 0 0 4px rgba(62,207,142,.18); flex: none; }
+  .stats .grow { flex: 1 1 auto; }
+  .stats .tip { font-size: calc(var(--fs-sub) - 1px); opacity: .85; }
+
+  /* ---------- list ---------- */
+  #file-list {
+    height: calc(100% - 0px);
+    overflow-x: hidden; overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px 14px calc(env(safe-area-inset-bottom) + 26px);
+  }
+  #file-list::-webkit-scrollbar { width: 4px; }
+  #file-list::-webkit-scrollbar-thumb { background: #ccd4e8; border-radius: 999px; }
+
+  .file-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: clamp(14px, 3.4vw, 24px) clamp(14px, 3.6vw, 26px);
+    margin-bottom: clamp(10px, 2.6vw, 18px);
+    background: #fff; border: 1px solid var(--line); border-radius: clamp(16px, 4vw, 28px);
+    box-shadow: var(--shadow-sm);
+    transition: transform .14s ease, box-shadow .14s ease;
+    animation: rise .4s cubic-bezier(.22,.8,.3,1) both;
+    animation-delay: calc(var(--i, 0) * 40ms);
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .file-item:active { transform: scale(.985); box-shadow: 0 4px 14px rgba(23,26,43,.08); }
+  .file-item__icon {
+    width: clamp(40px, 10vw, 68px); height: clamp(40px, 10vw, 68px); flex: none;
+    border-radius: clamp(13px, 3.2vw, 22px); background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center;
+  }
+  .file-item__icon svg { width: 52%; height: 52%; }
+  .file-item__main { flex: 1 1 auto; min-width: 0; }
+  #file-list .name-link {
+    display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: var(--fs-name); font-weight: 600; color: var(--ink); cursor: pointer;
+  }
+  #file-list .name-link:active { color: var(--accent); }
+  .file-item__meta {
+    margin-top: 4px; font-size: var(--fs-sub); color: var(--ink-3);
+    font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 8px;
+  }
+  .file-item__meta svg { width: 1em; height: 1em; flex: none; opacity: .8; }
+  .file-item__ops { display: flex; align-items: center; gap: clamp(8px, 2vw, 14px); flex: none; }
+  .op-btn {
+    width: clamp(44px, 11vw, 76px); height: clamp(44px, 11vw, 76px); border-radius: clamp(13px, 3.2vw, 22px);
+    background: #f5f7fd; border: 1px solid var(--line); color: var(--ink-2);
+    display: grid; place-items: center; cursor: pointer;
+    transition: transform .13s ease, background .13s ease, color .13s ease;
+  }
+  .op-btn svg { width: 50%; height: 50%; }
+  .op-btn:active { transform: scale(.9); }
+  .op-btn--dl:active { background: var(--accent-soft); color: var(--accent); }
+  .op-btn--del:active { background: #ffecea; color: var(--danger); }
+
+  .empty { padding: clamp(60px, 22vh, 160px) 20px; text-align: center; color: var(--ink-3); }
+  .empty__icon {
+    width: clamp(72px, 20vw, 130px); height: clamp(72px, 20vw, 130px); margin: 0 auto clamp(14px, 4vw, 26px);
+    border-radius: 34%; background: #fff; border: 1px solid var(--line); color: #b3bcd4;
+    display: grid; place-items: center; box-shadow: var(--shadow-sm);
+    animation: float 3.4s ease-in-out infinite;
+  }
+  .empty__icon svg { width: 46%; height: 46%; }
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  .empty__title { font-size: var(--fs-name); font-weight: 650; color: var(--ink-2); }
+  .empty__desc { font-size: var(--fs-sub); margin-top: 6px; }
+
+  /* ---------- tooltip (kept for API compat) ---------- */
+  .tooltip {
+    position: fixed; z-index: 1300; pointer-events: none;
+    padding: 6px 12px; border-radius: 10px; background: rgba(23,26,43,.9); color: #fff;
+    font-size: var(--fs-sub); white-space: nowrap; box-shadow: var(--shadow-md);
+  }
+
+  /* ---------- mask ---------- */
+  .modal-mask {
+    display: none; position: fixed; inset: 0; z-index: 880;
+    background: rgba(23,26,43,.46); backdrop-filter: blur(4px);
+    animation: fade .2s ease both;
+  }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+  /* ---------- delete dialog ---------- */
+  #deletePanel {
+    display: none; position: fixed; left: 50%; top: 50%; z-index: 900;
+    transform: translate(-50%, -50%);
+    width: min(440px, calc(100vw - 36px));
+    background: #fff; border-radius: clamp(20px, 5vw, 34px);
+    box-shadow: 0 30px 80px rgba(23,26,43,.3);
+    padding: clamp(20px, 5vw, 34px) clamp(18px, 5vw, 30px) clamp(16px, 4vw, 24px);
+    animation: pop .26s cubic-bezier(.2,.9,.3,1.08) both;
+  }
+  @keyframes pop { from { opacity: 0; transform: translate(-50%,-45%) scale(.92); } to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
+  .modal__icon {
+    width: clamp(48px, 12vw, 78px); height: clamp(48px, 12vw, 78px); margin: 0 auto clamp(10px, 2.6vw, 18px);
+    border-radius: 30%; background: #fff1f0; color: var(--danger); display: grid; place-items: center;
+  }
+  .modal__icon svg { width: 52%; height: 52%; }
+  .modal__title { text-align: center; font-size: var(--fs-title); font-weight: 700; }
+  .modal__desc { text-align: center; font-size: var(--fs-sub); color: var(--ink-3); margin: 4px 0 clamp(14px, 4vw, 22px); }
+  #pwdInput {
+    width: 100%; padding: clamp(12px, 3.2vw, 20px) 16px; font-size: var(--fs-name);
+    color: var(--ink); border: 1.5px solid var(--line); border-radius: clamp(13px, 3.2vw, 22px);
+    background: #fafbfe; outline: none; font-family: inherit;
+    transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+  }
+  #pwdInput::placeholder { color: #b0b7c9; }
+  #pwdInput:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 4px rgba(91,124,250,.16); }
+  #pwdErrorMsg { min-height: 26px; font-size: var(--fs-sub); color: var(--danger); padding: 6px 2px 0; }
+  .modal__actions { display: flex; gap: clamp(9px, 2.4vw, 14px); }
+  .modal__actions > * { flex: 1 1 50%; }
+  .btn {
+    appearance: none; border: 0; cursor: pointer; font-family: inherit;
+    padding: clamp(12px, 3.4vw, 22px) 16px; border-radius: clamp(13px, 3.4vw, 22px);
+    font-size: var(--fs-btn); font-weight: 650; text-align: center;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform .12s ease, opacity .15s ease, background .15s ease;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn--ghost { background: #f1f4fb; color: var(--ink-2); }
+  .btn--danger { background: linear-gradient(135deg, #f2605a, #d93a30); color: #fff; box-shadow: 0 10px 22px rgba(217,58,48,.26); }
+  .btn--primary { background: var(--grad); color: #fff; box-shadow: 0 10px 22px rgba(91,124,250,.3); }
+
+  /* ---------- upload sheet ---------- */
+  #archerUploadContainer {
+    background: #fff; color: var(--ink);
+    padding: clamp(16px, 4.4vw, 30px) clamp(16px, 4.4vw, 30px) calc(env(safe-area-inset-bottom) + clamp(18px, 4.6vw, 32px));
+    z-index: 999;
+    animation: sheetUp .3s cubic-bezier(.2,.9,.3,1) both;
+  }
+  @keyframes sheetUp { from { opacity: .6; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+  .up-header { display: flex; align-items: center; margin-bottom: clamp(14px, 3.6vw, 24px); }
+  .up-header__title {
+    flex: 1 1 auto; min-width: 0; font-size: var(--fs-title); font-weight: 700;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .up-header__badge {
+    width: clamp(34px, 8.4vw, 56px); height: clamp(34px, 8.4vw, 56px); border-radius: clamp(11px, 2.8vw, 18px);
+    background: var(--grad); color: #fff; display: grid; place-items: center; flex: none;
+  }
+  .up-header__badge svg { width: 54%; height: 54%; }
+  .up-close {
+    width: clamp(42px, 10.5vw, 68px); height: clamp(42px, 10.5vw, 68px); border-radius: 50%; flex: none;
+    background: #f2f5fb; color: var(--ink-2); display: grid; place-items: center; cursor: pointer;
+    transition: transform .13s ease, background .13s ease, color .13s ease;
+  }
+  .up-close svg { width: 44%; height: 44%; }
+  .up-close:active { transform: scale(.9); background: #ffecea; color: var(--danger); }
+
+  #archerDropZone {
+    border: 2px dashed #d6dcee; border-radius: clamp(18px, 4.6vw, 30px);
+    padding: clamp(28px, 8vw, 60px) 18px clamp(24px, 7vw, 52px);
+    text-align: center; background: linear-gradient(180deg, #fbfcff, #f4f7ff);
+    cursor: pointer; transition: border-color .2s ease, background .2s ease;
+  }
+  #archerDropZone.is-active { border-color: var(--accent); background: #eef3ff; }
+  .up-drop__icon {
+    width: clamp(64px, 17vw, 120px); height: clamp(64px, 17vw, 120px); margin: 0 auto clamp(12px, 3.4vw, 22px);
+    border-radius: 32%; background: #fff; border: 1px solid var(--line); color: var(--accent);
+    display: grid; place-items: center; box-shadow: var(--shadow-sm);
+    animation: float 3.2s ease-in-out infinite;
+  }
+  .up-drop__icon svg { width: 46%; height: 46%; }
+  .up-drop__title { font-size: var(--fs-name); font-weight: 650; }
+  .up-drop__sub { font-size: var(--fs-sub); color: var(--ink-3); margin-top: 5px; }
+  .up-drop__pill {
+    display: inline-block; margin-top: clamp(12px, 3.4vw, 20px);
+    padding: clamp(8px, 2.2vw, 14px) clamp(14px, 4vw, 24px); border-radius: 999px;
+    background: var(--accent-soft); color: #3f5bd0; font-size: var(--fs-sub); font-weight: 650;
+    border: 1px solid #dfe5ff;
+  }
+
+  #archerFileItem {
+    display: none; margin-top: clamp(12px, 3.4vw, 20px);
+    padding: clamp(12px, 3.4vw, 20px);
+    background: #f7f9ff; border: 1px solid #e6ebfb; border-radius: clamp(15px, 3.8vw, 26px);
+    align-items: center; justify-content: space-between; font-size: var(--fs-name);
+  }
+  .up-file { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; }
+  .up-file__icon {
+    width: clamp(34px, 8.6vw, 56px); height: clamp(34px, 8.6vw, 56px); border-radius: clamp(11px, 2.8vw, 18px);
+    background: #fff; border: 1px solid var(--line); color: var(--accent);
+    display: grid; place-items: center; flex: none;
+  }
+  .up-file__icon svg { width: 52%; height: 52%; }
+  #archerFileName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  #archerFileSize { flex: none; color: var(--ink-3); font-size: var(--fs-sub); font-variant-numeric: tabular-nums; }
+  #archerProgressBar { display: none; width: 100%; margin-top: clamp(12px, 3.2vw, 20px); }
+  .progress-track { width: 100%; height: clamp(8px, 2.2vw, 14px); background: #e8ecf8; border-radius: 999px; overflow: hidden; }
+  #archerProgress {
+    width: 0%; height: 100%; border-radius: 999px; background: var(--grad);
+    box-shadow: 0 0 14px rgba(91,124,250,.5); transition: width .2s ease;
+  }
+  #archerProgressText { text-align: center; font-size: var(--fs-sub); color: var(--ink-3); margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .up-actions { margin-top: clamp(16px, 4.4vw, 28px); display: flex; gap: clamp(9px, 2.4vw, 14px); }
+  .up-actions > * { flex: 1 1 50%; }
+  #archerClearBtn { background: #f1f4fb; color: var(--ink-2); }
+  #archerUploadBtn { background: var(--grad); color: #fff; box-shadow: 0 10px 22px rgba(91,124,250,.3); }
 </style>
-<div style="height: 100px;font-size: 72px; display: flex; justify-content: space-between; border-bottom: 2px solid #d8d8d8; padding: 16px 0px; text-align: center;background-color: white;">
-    <div style="padding: 0px 40px;">文件数据</div>
-    <div id="add-file" style="padding: 0px 40px; color: #c89a03;">⨁</div>
-</div>
-<div id="file-list" style="height: calc(100% - 150px); padding: 5px 30px; overflow-x: hidden; overflow-y: scroll;"></div>
-<div id="deletePanel" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%, -50%); background-color: white;max-width: 90%; border-radius: 54px; box-shadow: 0 20px 60px rgba(0, 20, 40, 0.08), 0 8px 24px rgba(0, 0, 0, 0.04);padding: 20px 26px 40px; transition: box-shadow 0.25s ease;z-index: 899;">
-    <input id="pwdInput" type="text" style="margin: 4px 60px;margin-top: 60px; width: 660px; padding:10px 20px; flex: 1;border: 2px solid #3787e8;border-radius: 36px; background: transparent;font-size: 64px;outline: none;" placeholder="请输入密码"/>
-    <div id="pwdErrorMsg" style="font-size: 24px; color: #db4b4b;padding: 0px 80px; margin-bottom: 20px; height:30px"></div>
-    <div style="width: 100%; height: 100px; margin-bottom: 20px; display: flex;justify-content: space-between;">
-    <div id="confirmDelete" style="padding: 10px 0px; width: 50%; font-size: 64px; color: #db4b4b;text-align: center;">确认</div>
-    <div onclick="hideDeletePanel()" style="padding: 10px 0px; width: 50%; font-size: 64px; color: #3787e8;text-align: center;">取消</div>
+</head>
+<body>
+<header class="appbar">
+  <div class="appbar__left">
+    <div class="appbar__logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 7h5l2 2.5h9A1.5 1.5 0 0 1 21.5 11v6.5A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5V8.5A1.5 1.5 0 0 1 4 7z"/>
+      </svg>
     </div>
+    <div class="appbar__title">
+      <h1>文件数据</h1>
+      <p>ARCHER DRIVE</p>
+    </div>
+  </div>
+  <div class="appbar__actions">
+    <div class="fab" id="refresh-list" title="刷新列表" role="button" tabindex="0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>
+      </svg>
+    </div>
+    <div class="fab fab--solid" id="add-file" title="上传文件" role="button" tabindex="0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </div>
+  </div>
+</header>
+
+<div class="stats">
+  <span class="dot"></span>
+  <span class="grow">共 <b id="file-count">0</b> 个文件</span>
+  <span class="tip">点名称预览 · 图标下载/删除</span>
 </div>
+
+<div id="file-list"></div>
+
+<div class="modal-mask" id="modalMask"></div>
+
+<div id="deletePanel">
+  <div class="modal__icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>
+    </svg>
+  </div>
+  <div class="modal__title">删除文件</div>
+  <div class="modal__desc">该操作不可撤销，请输入访问密码</div>
+  <input id="pwdInput" type="password" autocomplete="off" placeholder="请输入密码" />
+  <div id="pwdErrorMsg"></div>
+  <div class="modal__actions">
+    <div class="btn btn--danger" id="confirmDelete" role="button" tabindex="0">确认删除</div>
+    <div class="btn btn--ghost" onclick="hideDeletePanel()" role="button" tabindex="0">取消</div>
+  </div>
+</div>
+
 <script>
 const ctx = document.createElement('canvas').getContext('2d');
-function truncateByCanvas(str, maxWidth, fontSize = 14, fontFamily = 'Arial') {
+function truncateByCanvas(str, maxWidth, fontSize = 14, fontFamily = '-apple-system') {
   ctx.font = `${fontSize}px ${fontFamily}`;
   let result = '';
   for (let ch of str) {
@@ -36,13 +351,37 @@ function truncateByCanvas(str, maxWidth, fontSize = 14, fontFamily = 'Arial') {
     result = test;
   }
   return result;
-}function initElements() {
+}
+function drawToolTips(content, options) {
+    let tips = document.getElementById('archerToolTips');
+    if (!tips) {
+        tips = document.createElement('div');
+        tips.id = "archerToolTips";
+        tips.className = "tooltip";
+        document.body.appendChild(tips);
+    }
+    tips.innerHTML = content;
+    tips.style.left = options.left + 'px';
+    tips.style.top = options.top + 'px';
+    tips.style.display = "block";
+}
+function removeToolTips() {
+    let tips = document.getElementById('archerToolTips');
+    if (tips) {
+        tips.style.display = "none";
+    }
+}
+function initElements() {
     document.getElementById('archerProgressBar').style.display = "none";
     document.getElementById('archerProgress').style.width = '0%';
     document.getElementById('archerProgressText').textContent = '0%';
     document.getElementById('archerFileItem').style.display = "none";
     document.getElementById('archerDropZone').style.display = "block";
     document.getElementById("archerUploadContainer").style.display = "none";
+    let mask = document.getElementById('modalMask');
+    if(mask && document.getElementById('deletePanel').style.display !== 'block') {
+        mask.style.display = 'none';
+    }
     let clearBtn = document.getElementById('archerClearBtn');
     clearBtn.disabled = false;
     clearBtn.style.opacity = "1";
@@ -52,27 +391,19 @@ function truncateByCanvas(str, maxWidth, fontSize = 14, fontFamily = 'Arial') {
 }
 function createHeader(container) {
     const header = document.createElement('div');
-    header.innerHTML = '<span style="font-size: 64px; line-height: 1; width: calc(100% - 60px)">📤 上传文件</span>';
-    header.style.display = "flex";
-    header.style.alignItems = "center";
-    header.style.gap = "12px";
-    header.style.marginBottom = "28px";
+    header.className = "up-header";
+    header.innerHTML = '<span class="up-header__title"><span class="up-header__badge">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M12 17V3"/><path d="M6 9l6-6 6 6"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>' +
+        '</span>上传文件</span>';
     const closeBtn = document.createElement('div');
-    closeBtn.innerHTML = "✖";
-    closeBtn.style.color = "#000";
-    closeBtn.style.width = "70px";
-    closeBtn.style.fontSize = "64px";
-    closeBtn.style.cursor = "pointer";
-    closeBtn.style.textAlign = "right";
+    closeBtn.className = "up-close";
+    closeBtn.setAttribute("role", "button");
+    closeBtn.setAttribute("tabindex", "0");
+    closeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
     closeBtn.onclick = () => {
         initElements();
     };
-    closeBtn.onmouseover = () => {
-        closeBtn.style.color = "#f74215";
-    }
-    closeBtn.onmouseout = () => {
-        closeBtn.style.color = "#000";
-    }
     header.appendChild(closeBtn);
     container.appendChild(header);
 }
@@ -80,65 +411,75 @@ function createDropZone(container, options, uploadCallback) {
     const dropZone = document.createElement('div');
     dropZone.id = "archerDropZone";
     dropZone.innerHTML = `
-        <span style="font-size: 52px; display: block; margin-bottom: 16px; line-height: 1;">📁</span>
-        <div style="font-size: 48px; font-weight: 500; color: #0b1a33; margin-bottom: 6px;">点击选择文件</div>
+        <div class="up-drop__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+        </div>
+        <div class="up-drop__title">轻触选择文件</div>
+        <div class="up-drop__sub">也可以把文件拖拽到这里</div>
+        <span class="up-drop__pill">选择文件</span>
         <input type="file" id="archerFileInput" multiple style="display: none;" />
         `;
-    dropZone.style.border = "2px dashed #d7e0eb";
-    dropZone.style.borderRadius = "48px";
-    dropZone.style.padding = "52px 24px 48px";
-    dropZone.style.textAlign = "center";
-    dropZone.style.background = "#fafcff";
-    dropZone.style.transition = "background 0.2s, border-color 0.2s";
-    dropZone.style.cursor = "pointer";
-    dropZone.style.position = "relative";
-    dropZone.addEventListener('mouseover', (e) => {   
+    function addFile(file) {
+        dropZone.style.display = "none";
+        let k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
+        let i = Math.floor(Math.log(file.size) / Math.log(k));
+        document.getElementById('archerFileName').textContent = file.name;
+        document.getElementById('archerFileSize').textContent = parseFloat((file.size / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        let fileItem = document.getElementById('archerFileItem');
+        fileItem.style.display = "flex";
+
+        let uploadBtn = document.getElementById('archerUploadBtn');
+        let clearBtn = document.getElementById('archerClearBtn');
+        clearBtn.onclick = () => {
+            fileItem.style.display = "none";
+            uploadBtn.disabled = true;
+            uploadBtn.style.opacity = "0.5";
+            dropZone.style.display = "block";
+            document.getElementById('archerFileInput').value = "";
+        };
+        uploadBtn.disabled = false;
+        uploadBtn.style.opacity = "1";
+        uploadBtn.onclick = () => {
+            if(uploadCallback) {
+                uploadCallback(file);
+            }
+            if(options?.showProgressBar) {
+                document.getElementById('archerProgressBar').style.display = "block";
+            }
+            clearBtn.disabled = true;
+            clearBtn.style.opacity = "0.5";
+            uploadBtn.disabled = true;
+            uploadBtn.style.opacity = "0.5";
+        };
+    }
+    dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        dropZone.style.borderColor = "#a0b8d4";
-        dropZone.style.background = "#f5f9ff";
+        e.stopPropagation();
+        dropZone.classList.add('is-active');
     });
-    dropZone.addEventListener('mouseout', (e) => {
+    dropZone.addEventListener('dragleave', (e) => {
         e.preventDefault();
-        dropZone.style.borderColor = "#d7e0eb";
-        dropZone.style.background = "#fafcff";
+        e.stopPropagation();
+        dropZone.classList.remove('is-active');
+    });
+    ['dragenter', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
+    dropZone.addEventListener('drop', (e) => {
+        dropZone.classList.remove('is-active');
+        if (e.dataTransfer.files.length === 0) return;
+        addFile(e.dataTransfer.files[0]);
     });
     dropZone.onclick = () => {
         const fileInput = document.getElementById('archerFileInput');
-        fileInput.onchange = (event) => {
-            let files = event.target.files;
-            if (!files || files.length === 0) return;
-            dropZone.style.display = "none";
-            // event.target.files = [];
-            let file = files[0];
-            let k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
-            let i = Math.floor(Math.log(file.size) / Math.log(k));
-            document.getElementById('archerFileName').textContent = file.name;
-            document.getElementById('archerFileSize').textContent = parseFloat((file.size / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-            let fileItem = document.getElementById('archerFileItem');
-            fileItem.style.display = "block";
-            
-            let clearBtn = document.getElementById('archerClearBtn');
-            clearBtn.onclick = () => {
-                fileItem.style.display = "none";
-                uploadBtn.disabled = true;
-                uploadBtn.style.opacity = "0.5";
-                dropZone.style.display = "block";
-            };
-            let uploadBtn = document.getElementById('archerUploadBtn');
-            uploadBtn.disabled = false;
-            uploadBtn.style.opacity = "1";
-            uploadBtn.onclick = () => {
-                if(uploadCallback) {
-                    uploadCallback(file);
-                }
-                if(options?.showProgressBar) {
-                    document.getElementById('archerProgressBar').style.display = "block";
-                }
-                clearBtn.disabled = true;
-                clearBtn.style.opacity = "0.5";
-                uploadBtn.disabled = true;
-                uploadBtn.style.opacity = "0.5";
-            };
+        fileInput.onchange = (e) => {
+            if (e.target.files.length === 0) return;
+            addFile(e.target.files[0]);
         };
         fileInput.click();
     };
@@ -146,146 +487,76 @@ function createDropZone(container, options, uploadCallback) {
 }
 function createFileItem(container) {
     const fileItem = document.createElement('div');
-    fileItem.id = "archerFileItem";   
+    fileItem.id = "archerFileItem";
     fileItem.style.display = "none";
-    fileItem.style.alignItems = "center";
-    fileItem.style.justifyContent = "space-between";
-    fileItem.style.padding = "12px 16px";
-    fileItem.style.marginTop = "16px";
-    fileItem.style.background = "#fff";
-    fileItem.style.fontSize = "48px";
-    fileItem.style.color = "#0b1a33";
 
     fileItem.innerHTML = `
-        <div style="display: flex;">
-        <div id="archerFileName" style="width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
-        <div id="archerFileSize" style="width: 35%; text-align: right;"></div>
+        <div class="up-file">
+            <span class="up-file__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+                </svg>
+            </span>
+            <span id="archerFileName"></span>
+            <span id="archerFileSize"></span>
         </div>
     `;
 
     let progressBar = document.createElement('div');
     progressBar.id = "archerProgressBar";
     progressBar.style.display = "none";
-    progressBar.style.width = "100%";
-    progressBar.style.height = "60px";
-    progressBar.style.marginTop = "8px";
-    progressBar.innerHTML = `<div style="width: 100%; height: 16px; background: #eef3fe; border-radius: 3px; border: 1px solid #ccd4f5;">
-                                <div id="archerProgress" style="width: 0%; height: 100%; background: #4a6cf7; border-radius: 3px;"></div>
+    progressBar.innerHTML = `<div class="progress-track">
+                                <div id="archerProgress"></div>
                             </div>
-                            <div id="archerProgressText" style="text-align: center; font-size: 40px; color: #666; margin-top: 2px;">0%</div>`;
+                            <div id="archerProgressText">0%</div>`;
     fileItem.appendChild(progressBar);
 
     container.appendChild(fileItem);
 }
 function createActions(container) {
     const actions = document.createElement('div');
-    actions.style.marginTop = "24px";
-    actions.style.display = "flex";
-    actions.style.justifyContent = "flex-end";
-    actions.style.gap = "12px";
-    actions.style.flexWrap = "wrap";
-    
+    actions.className = "up-actions";
+
     let clearBtn = document.createElement('button');
     clearBtn.id = "archerClearBtn";
     clearBtn.type = "button";
-    clearBtn.innerHTML = "🗑 清空";
+    clearBtn.className = "btn btn--ghost";
+    clearBtn.textContent = "清空";
 
     let uploadBtn = document.createElement('button');
     uploadBtn.id = "archerUploadBtn";
     uploadBtn.type = "button";
     uploadBtn.disabled = true;
-    uploadBtn.innerHTML = "⬆ 上传";
-    
-    clearBtn.style.display = uploadBtn.style.display = "inline-flex";
-    clearBtn.style.alignItems = uploadBtn.style.alignItems = "center";
-    clearBtn.style.gap = uploadBtn.style.gap = "8px";
-    clearBtn.style.padding = uploadBtn.style.padding = "10px 26px";
-    clearBtn.style.borderRadius = uploadBtn.style.borderRadius = "36px";
-    clearBtn.style.fontSize = uploadBtn.style.fontSize = "40px";
-    clearBtn.style.fontWeight = uploadBtn.style.fontWeight = "500";
-    clearBtn.style.border = uploadBtn.style.border = "none";
-    clearBtn.style.color = uploadBtn.style.color = "#1f3a6b";
-    clearBtn.style.transition = uploadBtn.style.transition = "background 0.15s, transform 0.1s";
-    clearBtn.style.lineHeight = uploadBtn.style.lineHeight = "1.4";
-
-    clearBtn.style.background = "#eef3fe";
-    clearBtn.style.cursor = "pointer";
-    uploadBtn.style.cursor = "not-allowed";
-    uploadBtn.style.background = "#4a6cf7";
+    uploadBtn.className = "btn btn--primary";
     uploadBtn.style.opacity = "0.5";
-    uploadBtn.style.color = "#fff";
+    uploadBtn.style.cursor = "not-allowed";
+    uploadBtn.textContent = "上传";
 
-    clearBtn.addEventListener('mouseover', () => {
-        clearBtn.style.background = "#e1eafe";
-        clearBtn.style.borderColor = "#b0c4dd";
-        if(!clearBtn.disabled) {
-            clearBtn.style.cursor = "pointer";
-            clearBtn.style.opacity = "0.9";
-        } else {
-            clearBtn.style.cursor = "not-allowed";
-            clearBtn.style.opacity = "0.6";
-        }
-    });
-    clearBtn.addEventListener('mouseout', () => {
-        clearBtn.style.background = "#eef3fe";
-        clearBtn.style.borderColor = "transparent";
-        if(!clearBtn.disabled) {
-            clearBtn.style.cursor = "pointer";
-            clearBtn.style.opacity = "1";
-        } else {
-            clearBtn.style.cursor = "not-allowed";
-            clearBtn.style.opacity = "0.5";
-        }
-    });
-    uploadBtn.addEventListener('mouseover', () => {
-        uploadBtn.style.borderColor = "#3a5de0";
-        if(!uploadBtn.disabled) {
-            uploadBtn.style.cursor = "pointer";
-            uploadBtn.style.opacity = "0.9";
-        } else {
-            uploadBtn.style.cursor = "not-allowed";
-            uploadBtn.style.opacity = "0.6";
-        }
-    });
-    uploadBtn.addEventListener('mouseout', () => {
-        uploadBtn.style.borderColor = "transparent";
-        if(!uploadBtn.disabled) {
-            uploadBtn.style.cursor = "pointer";
-            uploadBtn.style.opacity = "1";
-        } else {
-            uploadBtn.style.cursor = "not-allowed";
-            uploadBtn.style.opacity = "0.5";
-        }
-    });
     actions.appendChild(clearBtn);
     actions.appendChild(uploadBtn);
     container.appendChild(actions);
 }
 function drawUploadWindow(options, uploadCallback) {
     let container = document.getElementById("archerUploadContainer");
+    let mask = document.getElementById('modalMask');
     if (container) {
         container.style.display = "block";
+        if(mask) mask.style.display = "block";
         return;
     }
     container = document.createElement('div');
     container.id = "archerUploadContainer";
-    container.style.minWidth = '80%';
-    container.style.background = '#ffffff';
-    container.style.borderRadius = '54px';
-    container.style.boxShadow = '0 20px 60px rgba(0, 20, 40, 0.08), 0 8px 24px rgba(0, 0, 0, 0.04)';
-    container.style.padding = '20px 36px 40px';
-    container.style.transition = 'box-shadow 0.25s ease';
-    container.style.zIndex = options?.zIndex || '999';
-    if(options?.left !== undefined && options?.top !== undefined) {
-        container.style.position = 'absolute';
-        container.style.left = options.left + 'px';
-        container.style.top = options.top + 'px';
-    } else {
-        container.style.position = 'fixed';
-        container.style.left = '50%';
-        container.style.top = '50%';
-        container.style.transform = 'translate(-50%, -50%)';
-    }
+    // 移动端：底部抽屉式面板
+    container.style.position = 'fixed';
+    container.style.left = '0';
+    container.style.right = '0';
+    container.style.bottom = '0';
+    container.style.width = '100%';
+    container.style.maxHeight = '88vh';
+    container.style.overflowY = 'auto';
+    container.style.borderRadius = 'clamp(24px, 6vw, 40px) clamp(24px, 6vw, 40px) 0 0';
+    container.style.boxShadow = 'var(--shadow-lg)';
+    if(mask) mask.style.display = "block";
     createHeader(container);
     createDropZone(container, {showProgressBar: options?.showProgressBar}, uploadCallback);
     createFileItem(container);
@@ -298,7 +569,6 @@ function updateProgress(percent) {
     progress.style.width = percent + '%';
     progressText.textContent = percent + '%';
 }
-
 function finishAndCloseUploadWindow(options, finishCallback) {
     let progress = document.getElementById('archerProgress');
     let progressText = document.getElementById('archerProgressText');
@@ -318,26 +588,26 @@ function finishAndCloseUploadWindow(options, finishCallback) {
         progressText.textContent = options.content || "失败"
     }
 }
-function uploadFile(file) { 
-    let formData = new FormData();  
-    formData.append('file', file);  
-    let xhr = new XMLHttpRequest(); 
-    xhr.upload.addEventListener('progress', function(event) { 
-        if (event.lengthComputable) {  
+function uploadFile(file) {
+    let formData = new FormData();
+    formData.append('file', file);
+    let xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener('progress', function(event) {
+        if (event.lengthComputable) {
             let percentComplete = Math.ceil((event.loaded / event.total) * 100);
             updateProgress(percentComplete);
-        }  
-    });  
-    xhr.addEventListener('load', function() { 
+        }
+    });
+    xhr.addEventListener('load', function() {
         finishAndCloseUploadWindow({success: true}, null);
         refreshFileList();
-    });  
-    xhr.addEventListener('error', function() { 
+    });
+    xhr.addEventListener('error', function() {
         finishAndCloseUploadWindow({success: false}, null);
-    }); 
+    });
     xhr.open('POST', '/upload', true);
-    xhr.send(formData); 
-}  
+    xhr.send(formData);
+}
 function downloadFileByName(name) {
     window.open('/download?filename='+name);
 }
@@ -347,8 +617,9 @@ function showFileByUrl(url) {
 function showDeletePanel(name) {
     let deleteEl = document.getElementById('deletePanel');
     deleteEl.style.display = "block";
-    let confirmDelBtn = document.getElementById('confirmDelete');
-    confirmDelBtn.onclick = () => {
+    document.getElementById('modalMask').style.display = "block";
+    document.getElementById('pwdInput').focus();
+    document.getElementById('confirmDelete').onclick = () => {
         let input = document.getElementById('pwdInput');
         let error = document.getElementById('pwdErrorMsg');
         if(!input.value || input.value === '') {
@@ -358,12 +629,13 @@ function showDeletePanel(name) {
         let xhr = new XMLHttpRequest();
         xhr.open('POST', '/remove', false);
         xhr.setRequestHeader("content-type", "application/json");
-        xhr.send(JSON.stringify({name, password: input.value})); 
+        xhr.send(JSON.stringify({name, password: input.value}));
         if(xhr.status === 200) {
             let res = JSON.parse(xhr.responseText);
             if(res.success) {
                 deleteEl.display = 'none';
                 input.value = ""
+                hideDeletePanel();
                 refreshFileList();
                 return ;
             }
@@ -373,15 +645,20 @@ function showDeletePanel(name) {
 }
 function hideDeletePanel() {
     document.getElementById('deletePanel').style.display = "none";
+    let mask = document.getElementById('modalMask');
+    let up = document.getElementById('archerUploadContainer');
+    if(!up || up.style.display !== 'block') {
+        mask.style.display = "none";
+    }
     document.getElementById('pwdInput').value = '';
     document.getElementById('pwdErrorMsg').innerHTML = '';
 }
 function refreshFileList() {
     let data = {total: 0, pageNum: 1, files: []};
     try {
-        let xhr = new XMLHttpRequest();  
-        xhr.open('GET', '/list?pageNum=1', false);  
-        xhr.send(null); 
+        let xhr = new XMLHttpRequest();
+        xhr.open('GET', '/list?pageNum=1', false);
+        xhr.send(null);
         if(xhr.status === 200) {
             let res = JSON.parse(xhr.responseText);
             if(res.success && res.data) {
@@ -391,41 +668,88 @@ function refreshFileList() {
     } catch(err) {
         console.log(err);
     }
-
-    let fileList = document.getElementById('file-list');  
-    let html = "", i = 0, fUrl = '', fName = '';
+    let fileList = document.getElementById('file-list');
+    let countEl = document.getElementById('file-count');
+    if(countEl) countEl.textContent = data.files.length;
+    if(data.files.length === 0) {
+        fileList.innerHTML = `
+        <div class="empty">
+            <div class="empty__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 7h5l2 2.5h9A1.5 1.5 0 0 1 21.5 11v6.5A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5V8.5A1.5 1.5 0 0 1 4 7z"/>
+                </svg>
+            </div>
+            <div class="empty__title">暂无文件</div>
+            <div class="empty__desc">点右上角「＋」上传第一个文件</div>
+        </div>`;
+        return;
+    }
+    let html = "", i = 0, fName = '';
     for(let f of data.files) {
-        fName = truncateByCanvas(f.name, 800, 64);
+        fName = truncateByCanvas(f.name, 900, 22);
         html += `
-        <div style="margin-bottom: 20px; background-color: white; border-radius: 16px; padding: 10px 30px;">
-            <div style="font-size: 64px; font-weight: 600; font-family:Arial, Helvetica, sans-serif; color: #3787e8; cursor:pointer" onclick="showFileByUrl('/${f.url}')">${fName}</div>
-            <div style="font-size: 36px;color: darkgrey;display: flex; align-items: flex-end;width: 100%;border-bottom: 2px solid #d8d8d8;">${f.time}</div>
-            <div style="display: flex;justify-content: space-between; margin-top: 10px;">
-                <div style="display:flex;width: 50%;color: #3787e8; cursor:pointer;height:100px;justify-content: center;align-items: center;" onclick="downloadFileByName('${f.name}')">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
+        <div class="file-item" style="--i:${i}">
+            <span class="file-item__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+                </svg>
+            </span>
+            <div id="file-name-${i}" class="file-item__main">
+                <div class="name-link" onclick="showFileByUrl('/${f.url}')">${fName}</div>
+                <div class="file-item__meta">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/>
+                    </svg>
+                    ${f.time}
+                </div>
+            </div>
+            <div class="file-item__ops">
+                <div class="op-btn op-btn--dl" onclick="downloadFileByName('${f.name}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
                 </div>
-                <div style="display:flex;width: 50%;color: #3787e8; cursor:pointer;height:100px;justify-content: center;align-items: center;" onclick="showDeletePanel('${f.name}')">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <div class="op-btn op-btn--del" onclick="showDeletePanel('${f.name}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                     </svg>
                 </div>
             </div>
         </div>`;
+        i++
     }
     fileList.innerHTML = html;
 }
 window.onload = function() {
     refreshFileList();
-    let tipsEl = document.getElementById('add-file');
-    tipsEl.onclick = () => {
+    let addFileEl = document.getElementById('add-file');
+    addFileEl.onclick = () => {
         drawUploadWindow({showProgressBar: true}, (file) => {
             uploadFile(file);
         });
+    };
+    let refreshEl = document.getElementById('refresh-list');
+    refreshEl.onclick = () => {
+        refreshEl.classList.remove('spin');
+        void refreshEl.offsetWidth;
+        refreshEl.classList.add('spin');
+        refreshFileList();
+    };
+    document.getElementById('modalMask').ontouchstart = () => {};
+    document.getElementById('modalMask').onclick = () => {
+        let panel = document.getElementById('deletePanel');
+        if(panel.style.display === 'block') {
+            hideDeletePanel();
+        } else if(document.getElementById('archerUploadContainer')) {
+            initElements();
+            document.getElementById('modalMask').style.display = 'none';
+        }
+    };
+    document.getElementById('pwdInput').onkeydown = (e) => {
+        if(e.key === 'Enter') document.getElementById('confirmDelete').click();
     };
 };
 </script>

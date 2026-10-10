@@ -1,39 +1,405 @@
 <!DOCTYPE html>
-<html lang="zh-CN" style="height: 100%;">
+<html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <title>文件存取</title>
-</head>
-<body style="background-color: white; height: 100vh; margin: 0px;">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#5b7cfa">
+<title>文件存取 · Archer Drive</title>
 <style>
-  .file-item:hover {
-    background-color: #e7e5e5;
+  :root {
+    --accent: #5b7cfa;
+    --accent-2: #8a5cf6;
+    --accent-soft: #eef2ff;
+    --ink: #171a2b;
+    --ink-2: #4a5168;
+    --ink-3: #8b93a7;
+    --line: #e6e9f2;
+    --surface: #ffffff;
+    --bg: #f5f6fb;
+    --danger: #e0483d;
+    --radius: 16px;
+    --shadow-sm: 0 1px 2px rgba(23, 26, 43, .06), 0 4px 16px rgba(23, 26, 43, .05);
+    --shadow-md: 0 12px 32px rgba(23, 26, 43, .10), 0 2px 8px rgba(23, 26, 43, .05);
+    --shadow-lg: 0 30px 70px rgba(23, 26, 43, .18), 0 8px 20px rgba(23, 26, 43, .10);
+    --grad: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   }
-  ::-webkit-scrollbar {
-    width: 0px;
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  /* ambient background */
+  .bg-decor { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .bg-decor::before, .bg-decor::after {
+    content: ""; position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55;
+  }
+  .bg-decor::before { width: 620px; height: 620px; top: -240px; left: -160px; background: radial-gradient(circle, #cddaff 0%, rgba(205,218,255,0) 70%); }
+  .bg-decor::after  { width: 560px; height: 560px; bottom: -260px; right: -140px; background: radial-gradient(circle, #e3d5ff 0%, rgba(227,213,255,0) 70%); }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: relative; z-index: 3;
+    height: 68px; padding: 0 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,.78);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand__logo {
+    width: 40px; height: 40px; border-radius: 13px; background: var(--grad);
+    display: grid; place-items: center; color: #fff; flex: none;
+    box-shadow: 0 8px 20px rgba(91,124,250,.35);
+  }
+  .brand__logo svg { width: 22px; height: 22px; }
+  .brand__text h1 { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: .3px; }
+  .brand__text p { margin: 1px 0 0; font-size: 12px; color: var(--ink-3); letter-spacing: .6px; }
+  .topbar__right { display: flex; align-items: center; gap: 12px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 14px; border-radius: 999px;
+    background: var(--accent-soft); color: #3f5bd0;
+    font-size: 13px; font-weight: 500; border: 1px solid #dfe5ff;
+  }
+  .chip b { font-weight: 700; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 12px; flex: none;
+    border: 1px solid var(--line); background: #fff; color: var(--ink-2);
+    display: grid; place-items: center; cursor: pointer; font-size: 15px;
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .icon-btn svg { width: 19px; height: 19px; }
+  .icon-btn:hover { color: var(--accent); border-color: #c9d4ff; box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+  .icon-btn:active { transform: translateY(0) scale(.96); }
+  .icon-btn--primary { background: var(--grad); border-color: transparent; color: #fff; box-shadow: 0 8px 20px rgba(91,124,250,.32); }
+  .icon-btn--primary:hover { color: #fff; box-shadow: 0 12px 26px rgba(91,124,250,.42); }
+  .icon-btn.spin svg { animation: spin .6s linear; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- content ---------- */
+  .content {
+    position: relative; z-index: 2;
+    height: calc(100% - 68px);
+    padding: 26px 28px 30px;
+    display: flex; justify-content: center;
+  }
+  .panel {
+    width: 100%; max-width: 1180px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 22px; box-shadow: var(--shadow-md);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .panel__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 18px 26px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #fbfcff, #f7f8fd);
+  }
+  .panel__title { margin: 0; font-size: 16px; font-weight: 650; display: flex; align-items: center; gap: 9px; }
+  .panel__title::before { content: ""; width: 4px; height: 16px; border-radius: 4px; background: var(--grad); }
+  .panel__hint { font-size: 12.5px; color: var(--ink-3); }
+  .list-head {
+    display: flex; align-items: center; gap: 16px;
+    padding: 11px 26px; font-size: 12px; font-weight: 600; letter-spacing: .8px;
+    color: var(--ink-3); text-transform: uppercase; border-bottom: 1px solid var(--line);
+    background: #fff;
+  }
+  .list-head .c-name { flex: 1 1 auto; }
+  .list-head .c-time { flex: 0 0 190px; text-align: center; }
+  .list-head .c-op   { flex: 0 0 104px; text-align: center; }
+
+  #file-list { flex: 1 1 auto; overflow-x: hidden; overflow-y: auto; padding: 8px 0 14px; }
+  #file-list::-webkit-scrollbar { width: 10px; }
+  #file-list::-webkit-scrollbar-thumb { background: #d3d8e8; border: 3px solid #fff; border-radius: 999px; }
+  #file-list::-webkit-scrollbar-thumb:hover { background: #b9c1d8; }
+  #file-list::-webkit-scrollbar-track { background: transparent; }
+
+  .file-item {
+    display: flex; align-items: center; gap: 16px;
+    padding: 13px 26px; margin: 0 10px; border-radius: 14px;
+    transition: background .16s ease, box-shadow .16s ease, transform .16s ease;
+    animation: rise .38s cubic-bezier(.22,.8,.3,1) both;
+    animation-delay: calc(var(--i, 0) * 28ms);
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .file-item:hover { background: #f6f8ff; box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+  .file-item + .file-item { border-top: 0; }
+  .file-item__icon {
+    width: 38px; height: 38px; border-radius: 11px; flex: none;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center;
+  }
+  .file-item__icon svg { width: 19px; height: 19px; }
+  .file-item .c-name { flex: 1 1 auto; min-width: 0; }
+  #file-list .name-link {
+    max-width: 100%; width: fit-content;
+    display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 16px; font-weight: 550; color: var(--ink);
+    cursor: pointer; border-radius: 6px;
+    transition: color .15s ease;
+  }
+  #file-list .name-link:hover { color: var(--accent); }
+  #file-list .name-link::after {
+    content: ""; display: block; height: 2px; width: 100%;
+    background: var(--grad); border-radius: 2px;
+    transform: scaleX(0); transform-origin: left; opacity: 0;
+    transition: transform .22s ease, opacity .22s ease;
+  }
+  #file-list .name-link:hover::after { transform: scaleX(1); opacity: 1; }
+  .file-item .c-time { flex: 0 0 190px; text-align: center; font-size: 13.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .file-item .c-op { flex: 0 0 104px; display: flex; justify-content: center; gap: 8px; }
+  .op-btn {
+    width: 34px; height: 34px; border-radius: 10px; border: 1px solid transparent;
+    display: grid; place-items: center; cursor: pointer; color: var(--ink-3); background: transparent;
+    opacity: .55; transition: all .16s ease;
+  }
+  .op-btn svg { width: 18px; height: 18px; }
+  .file-item:hover .op-btn { opacity: 1; }
+  .op-btn:hover { background: #fff; border-color: #c9d4ff; color: var(--accent); box-shadow: var(--shadow-sm); }
+  .op-btn--danger:hover { border-color: #f6c9c6; color: var(--danger); background: #fff6f5; }
+
+  .empty {
+    padding: 76px 20px; text-align: center; color: var(--ink-3);
+  }
+  .empty__icon {
+    width: 74px; height: 74px; margin: 0 auto 16px; border-radius: 24px;
+    background: linear-gradient(160deg, #f2f4fb, #e9edfa); color: #aab3cc;
+    display: grid; place-items: center;
+  }
+  .empty__icon svg { width: 32px; height: 32px; }
+  .empty__title { font-size: 16px; font-weight: 600; color: var(--ink-2); }
+  .empty__desc { font-size: 13.5px; margin-top: 5px; }
+
+  /* ---------- tooltip ---------- */
+  .tooltip {
+    position: fixed; z-index: 1200; pointer-events: none;
+    padding: 7px 13px; border-radius: 10px;
+    background: rgba(23,26,43,.92); color: #fff; font-size: 12.5px; letter-spacing: .3px;
+    box-shadow: var(--shadow-md); white-space: nowrap;
+    animation: tipIn .16s ease both;
+  }
+  .tooltip::after {
+    content: ""; position: absolute; top: -5px; left: 22px;
+    border: 5px solid transparent; border-top: 0; border-bottom-color: rgba(23,26,43,.92);
+  }
+  @keyframes tipIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- modal (delete) ---------- */
+  .modal-mask {
+    display: none; position: fixed; inset: 0; z-index: 880;
+    background: rgba(23,26,43,.42); backdrop-filter: blur(3px);
+    animation: fade .2s ease both;
+  }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  #deletePanel {
+    display: none; position: fixed; left: 50%; top: 50%; z-index: 900;
+    transform: translate(-50%, -50%);
+    width: 400px; max-width: calc(100vw - 40px);
+    background: var(--surface); border-radius: 20px; box-shadow: var(--shadow-lg);
+    padding: 24px 26px 20px;
+    animation: pop .24s cubic-bezier(.2,.9,.3,1.1) both;
+  }
+  @keyframes pop { from { opacity: 0; transform: translate(-50%,-46%) scale(.94); } to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
+  .modal__icon {
+    width: 46px; height: 46px; border-radius: 15px; margin: 0 auto 12px;
+    background: #fff1f0; color: var(--danger); display: grid; place-items: center;
+  }
+  .modal__icon svg { width: 23px; height: 23px; }
+  .modal__title { text-align: center; font-size: 17px; font-weight: 650; }
+  .modal__desc { text-align: center; font-size: 13px; color: var(--ink-3); margin: 5px 0 18px; }
+  #pwdInput {
+    width: 100%; padding: 12px 16px; font-size: 15px; color: var(--ink);
+    border: 1.5px solid var(--line); border-radius: 12px; background: #fafbfd; outline: none;
+    transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+  }
+  #pwdInput::placeholder { color: #b0b7c9; }
+  #pwdInput:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 4px rgba(91,124,250,.14); }
+  #pwdErrorMsg { min-height: 22px; font-size: 12.5px; color: var(--danger); padding: 6px 2px 0; }
+  .modal__actions { display: flex; gap: 10px; margin-top: 4px; }
+  .modal__actions > * { flex: 1 1 50%; }
+  .btn {
+    appearance: none; border: 1px solid transparent; cursor: pointer;
+    padding: 11px 18px; border-radius: 12px; font-size: 14.5px; font-weight: 600;
+    font-family: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform .12s ease, box-shadow .16s ease, background .16s ease, color .16s ease, opacity .16s ease;
+  }
+  .btn:active { transform: translateY(1px) scale(.99); }
+  .btn--ghost { background: #f2f4fa; color: var(--ink-2); }
+  .btn--ghost:hover { background: #e8ebf6; color: var(--ink); }
+  .btn--danger { background: linear-gradient(135deg, #f2605a, #d93a30); color: #fff; box-shadow: 0 8px 18px rgba(217,58,48,.28); }
+  .btn--danger:hover { box-shadow: 0 12px 24px rgba(217,58,48,.36); }
+  .btn--primary { background: var(--grad); color: #fff; box-shadow: 0 8px 18px rgba(91,124,250,.3); }
+  .btn--primary:hover { box-shadow: 0 12px 26px rgba(91,124,250,.4); }
+  .btn[disabled] { cursor: not-allowed; box-shadow: none; }
+
+  /* ---------- upload window ---------- */
+  #archerUploadContainer {
+    width: 100%; max-width: 620px; background: var(--surface);
+    border-radius: 22px; box-shadow: var(--shadow-lg);
+    padding: 22px 30px 26px; z-index: 999;
+    animation: pop .26s cubic-bezier(.2,.9,.3,1.1) both;
+  }
+  .up-header { display: flex; align-items: center; margin-bottom: 18px; }
+  .up-header__title {
+    font-size: 17px; font-weight: 650; letter-spacing: .2px; flex: 1 1 auto;
+    display: flex; align-items: center; gap: 10px; color: var(--ink);
+  }
+  .up-header__badge {
+    width: 30px; height: 30px; border-radius: 10px; background: var(--grad); color: #fff;
+    display: grid; place-items: center; font-size: 14px;
+  }
+  .up-close {
+    width: 34px; height: 34px; border-radius: 10px; cursor: pointer; flex: none;
+    display: grid; place-items: center; color: var(--ink-3); background: #f4f6fb;
+    transition: all .16s ease;
+  }
+  .up-close:hover { background: #ffeceb; color: var(--danger); }
+  .up-close svg { width: 15px; height: 15px; }
+
+  #archerDropZone {
+    border: 2px dashed #d5dbec; border-radius: 18px; padding: 42px 22px 38px;
+    text-align: center; background: linear-gradient(180deg, #fbfcff, #f5f7fe);
+    cursor: pointer; position: relative;
+    transition: border-color .2s ease, background .2s ease, box-shadow .2s ease, transform .2s ease;
+  }
+  #archerDropZone:hover, #archerDropZone.is-active {
+    border-color: var(--accent); background: #f2f6ff; box-shadow: 0 0 0 6px rgba(91,124,250,.08);
+  }
+  .up-drop__icon {
+    width: 66px; height: 66px; margin: 0 auto 14px; border-radius: 22px; background: #fff;
+    border: 1px solid var(--line); color: var(--accent);
+    display: grid; place-items: center; box-shadow: var(--shadow-sm);
+    animation: float 3.2s ease-in-out infinite;
+  }
+  .up-drop__icon svg { width: 28px; height: 28px; }
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  .up-drop__title { font-size: 16px; font-weight: 600; color: var(--ink); }
+  .up-drop__sub { font-size: 13px; color: var(--ink-3); margin-top: 4px; }
+  .up-drop__pill {
+    display: inline-block; margin-top: 14px; padding: 6px 14px; border-radius: 999px;
+    background: var(--accent-soft); color: #3f5bd0; font-size: 12.5px; font-weight: 600;
+    border: 1px solid #dfe5ff;
+  }
+
+  #archerFileItem {
+    display: none; margin-top: 16px; padding: 13px 16px;
+    background: #f8faff; border: 1px solid #e6ebfb; border-radius: 14px;
+    align-items: center; justify-content: space-between; font-size: 14px; color: var(--ink);
+  }
+  .up-file { display: flex; align-items: center; gap: 11px; min-width: 0; flex: 1 1 auto; }
+  .up-file__icon {
+    width: 34px; height: 34px; border-radius: 10px; background: #fff; border: 1px solid var(--line);
+    color: var(--accent); display: grid; place-items: center; flex: none;
+  }
+  .up-file__icon svg { width: 17px; height: 17px; }
+  #archerFileName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+  #archerFileSize { flex: none; color: var(--ink-3); font-size: 13px; font-variant-numeric: tabular-nums; }
+  #archerProgressBar { display: none; width: 100%; margin-top: 12px; }
+  .progress-track {
+    width: 100%; height: 8px; background: #e8ecf8; border-radius: 999px; overflow: hidden;
+  }
+  #archerProgress {
+    width: 0%; height: 100%; border-radius: 999px; background: var(--grad);
+    box-shadow: 0 0 12px rgba(91,124,250,.5); transition: width .2s ease;
+  }
+  #archerProgressText { text-align: center; font-size: 12px; color: var(--ink-3); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .up-actions { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+  #archerClearBtn { background: #f2f4fa; color: var(--ink-2); }
+  #archerClearBtn:hover { background: #e8ebf6; color: var(--ink); }
+  #archerUploadBtn { background: var(--grad); color: #fff; box-shadow: 0 8px 18px rgba(91,124,250,.3); }
+  #archerUploadBtn:hover { box-shadow: 0 12px 26px rgba(91,124,250,.4); }
+
+  @media (max-width: 780px) {
+    .topbar { padding: 0 16px; height: 60px; }
+    .brand__text p { display: none; }
+    .chip { display: none; }
+    .content { padding: 14px 12px 18px; height: calc(100% - 60px); }
+    .panel { border-radius: 18px; }
+    .list-head .c-time, .file-item .c-time { flex-basis: 120px; font-size: 12px; }
+    .list-head .c-op, .file-item .c-op { flex-basis: 84px; }
+    .file-item { padding: 12px 16px; }
+    .list-head { padding: 10px 16px; }
+    .op-btn { opacity: 1; }
+    #archerUploadContainer { padding: 18px 18px 20px; }
   }
 </style>
-<div style="height: 30px;font-size: 24px; display: flex; justify-content: space-between; border-bottom: 1px solid #ababab; padding: 16px 0px; text-align: center;background-color: #e7e5e5;">
-    <div style="margin: 0px 40px;">文件数据</div>
-    <div id="add-file" style="margin: 0px 40px; color: #3787e8; cursor:pointer;">
-        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="12" y1="5" x2="12" y2="19" />
-        <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
+</head>
+<body>
+<div class="bg-decor" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand__logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 7h5l2 2.5h9A1.5 1.5 0 0 1 21.5 11v6.5A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5V8.5A1.5 1.5 0 0 1 4 7z"/>
+      </svg>
     </div>
-</div>
-<div id="file-list" style="height: calc(100% - 50px); padding: 5px 30px; overflow-x: hidden; overflow-y: scroll;"></div>
-<div id="deletePanel" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%, -50%); background-color: white;max-width: 90%; border-radius: 54px; box-shadow: 0 20px 60px rgba(0, 20, 40, 0.08), 0 8px 24px rgba(0, 0, 0, 0.04);padding: 4px 16px; transition: box-shadow 0.25s ease;z-index: 899;">
-    <input id="pwdInput" type="text" style="margin: 4px 40px;margin-top: 30px; width: 454px; padding:10px 20px; flex: 1;border: 2px solid #3787e8;border-radius: 36px; background: transparent;font-size: 16px;outline: none;" placeholder="请输入密码"/>
-    <div id="pwdErrorMsg" style="font-size: 12px; color: #db4b4b;margin: 0px 40px; margin-bottom: 10px; padding: 0px 20px; width: 460px; height:10px"></div>
-    <div style="margin: 30px 40px; width: 500px; display: flex;justify-content: space-between;">
-    <div id="confirmDelete" style="margin-right: 30px;padding: 10px 0px; width: 50%; font-size: 16px; border-radius: 36px; background-color: #db4b4b; color: white;text-align: center;">确认</div>
-    <div onclick="hideDeletePanel()" style="margin-left: 30xp;padding: 10px 0px; width: 50%; font-size: 16px; border-radius: 36px; background-color: #3787e8; color: white;text-align: center;">取消</div>
+    <div class="brand__text">
+      <h1>文件存取</h1>
+      <p>ARCHER DRIVE · 本地文件服务</p>
     </div>
+  </div>
+  <div class="topbar__right">
+    <span class="chip">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+      </svg>
+      共 <b id="file-count">0</b> 个文件
+    </span>
+    <div class="icon-btn icon-btn--primary" id="add-file" title="上传文件" role="button" tabindex="0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </div>
+    <div class="icon-btn" id="refresh-list" title="刷新列表" role="button" tabindex="0">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>
+      </svg>
+    </div>
+  </div>
+</header>
+
+<main class="content">
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">文件列表</h2>
+      <span class="panel__hint">点击文件名可预览 · 悬停行可下载 / 删除</span>
+    </div>
+    <div class="list-head">
+      <span class="c-name">名称</span>
+      <span class="c-time">修改时间</span>
+      <span class="c-op">操作</span>
+    </div>
+    <div id="file-list"></div>
+  </section>
+</main>
+
+<div class="modal-mask" id="modalMask"></div>
+
+<div id="deletePanel">
+  <div class="modal__icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>
+    </svg>
+  </div>
+  <div class="modal__title">删除文件</div>
+  <div class="modal__desc">该操作不可撤销，请输入访问密码</div>
+  <input id="pwdInput" type="password" autocomplete="off" placeholder="请输入密码" />
+  <div id="pwdErrorMsg"></div>
+  <div class="modal__actions">
+    <div class="btn btn--danger" id="confirmDelete" role="button" tabindex="0">确认删除</div>
+    <div class="btn btn--ghost" onclick="hideDeletePanel()" role="button" tabindex="0">取消</div>
+  </div>
 </div>
+
 <script>
 const ctx = document.createElement('canvas').getContext('2d');
-function truncateByCanvas(str, maxWidth, fontSize = 14, fontFamily = 'Arial') {
+function truncateByCanvas(str, maxWidth, fontSize = 14, fontFamily = 'Segoe UI') {
   ctx.font = `${fontSize}px ${fontFamily}`;
   let result = '';
   for (let ch of str) {
@@ -46,66 +412,23 @@ function truncateByCanvas(str, maxWidth, fontSize = 14, fontFamily = 'Arial') {
   return result;
 }
 function drawToolTips(content, options) {
-  if(!content) {
-    content = "提示";
-  }
-  if(!options) {
-    options = {};
-  }
-  let elId = `archer-tooltip-bottom`
-  let  left = options.left || 0, top = options.top || 0;
-  let backgroundColor = options.backgroundColor || '#e2e8f0';
-  let afterCssRule = `#${elId}::after {content: ''; position: absolute; bottom: 100%;left: 50%;transform: translateX(-50%) rotateX(180deg);border: 9px solid transparent;border-top-color: ${backgroundColor};pointer-events: none; }`
-
-  let tooltip = document.getElementById(elId);
-  if(tooltip) {
-    tooltip.innerHTML = content;
-    tooltip.style.display = 'inline-block';
-    tooltip.style.left = left + 'px';
-    tooltip.style.top = top + 'px';
-    return;
-  }
-  if(afterCssRule) {
-    tooltip = document.createElement('div');
-    tooltip.id = elId;
-    tooltip.innerHTML = content;
-    tooltip.style.display = 'inline-block';
-    tooltip.style.position = 'absolute';
-    tooltip.style.zIndex = '1000';
-    tooltip.style.left = left + 'px';
-    tooltip.style.top = top + 'px';
-    tooltip.style.display = 'inline-block';
-    tooltip.style.padding = '4px 6px';
-    tooltip.style.fontSize = '14px';
-    tooltip.style.lineHeight = '1.5';
-    tooltip.style.borderRadius = '8px';
-    tooltip.style.backgroundColor = backgroundColor;
-    tooltip.style.boxShadow = '0 8px 28px rgba(0, 0, 0, 0.18)';
-    tooltip.style.textAlign = 'center';
-    tooltip.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
-    let sheet = null;
-    if(document.styleSheets.length > 0) {
-      sheet = document.styleSheets[0];
-    } else {
-      let style = document.createElement('style');
-      document.head.appendChild(style);
-      sheet = document.styleSheets[0];
+    let tips = document.getElementById('archerToolTips');
+    if (!tips) {
+        tips = document.createElement('div');
+        tips.id = "archerToolTips";
+        tips.className = "tooltip";
+        document.body.appendChild(tips);
     }
-    for(let rule of sheet.cssRules) {
-      if (rule.selectorText === `#${elId}::after`) {
-        return ;
-      }
-    }
-    sheet.insertRule(afterCssRule, sheet.cssRules.length);
-    document.body.appendChild(tooltip);
-  }
+    tips.innerHTML = content;
+    tips.style.left = options.left + 'px';
+    tips.style.top = options.top + 'px';
+    tips.style.display = "block";
 }
 function removeToolTips() {
-  let elId = `archer-tooltip-bottom`
-  let tooltip = document.getElementById(elId);
-  if(tooltip) {
-    tooltip.style.display = 'none';
-  }
+    let tips = document.getElementById('archerToolTips');
+    if (tips) {
+        tips.style.display = "none";
+    }
 }
 function initElements() {
     document.getElementById('archerProgressBar').style.display = "none";
@@ -114,6 +437,10 @@ function initElements() {
     document.getElementById('archerFileItem').style.display = "none";
     document.getElementById('archerDropZone').style.display = "block";
     document.getElementById("archerUploadContainer").style.display = "none";
+    let mask = document.getElementById('modalMask');
+    if(mask && document.getElementById('deletePanel').style.display !== 'block') {
+        mask.style.display = 'none';
+    }
     let clearBtn = document.getElementById('archerClearBtn');
     clearBtn.disabled = false;
     clearBtn.style.opacity = "1";
@@ -123,27 +450,19 @@ function initElements() {
 }
 function createHeader(container) {
     const header = document.createElement('div');
-    header.innerHTML = '<span style="font-size: 24px; line-height: 1; width: calc(100% - 30px)">📤 上传文件</span>';
-    header.style.display = "flex";
-    header.style.alignItems = "center";
-    header.style.gap = "12px";
-    header.style.marginBottom = "28px";
+    header.className = "up-header";
+    header.innerHTML = '<span class="up-header__title"><span class="up-header__badge">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M12 17V3"/><path d="M6 9l6-6 6 6"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>' +
+        '</span>上传文件</span>';
     const closeBtn = document.createElement('div');
-    closeBtn.innerHTML = "✖";
-    closeBtn.style.color = "#000";
-    closeBtn.style.width = "30px";
-    closeBtn.style.fontSize = "24px";
-    closeBtn.style.cursor = "pointer";
-    closeBtn.style.textAlign = "right";
+    closeBtn.className = "up-close";
+    closeBtn.setAttribute("role", "button");
+    closeBtn.setAttribute("tabindex", "0");
+    closeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
     closeBtn.onclick = () => {
         initElements();
     };
-    closeBtn.onmouseover = () => {
-        closeBtn.style.color = "#f74215";
-    }
-    closeBtn.onmouseout = () => {
-        closeBtn.style.color = "#000";
-    }
     header.appendChild(closeBtn);
     container.appendChild(header);
 }
@@ -151,18 +470,16 @@ function createDropZone(container, options, uploadCallback) {
     const dropZone = document.createElement('div');
     dropZone.id = "archerDropZone";
     dropZone.innerHTML = `
-        <span style="font-size: 52px; display: block; margin-bottom: 16px; line-height: 1;">📁</span>
-        <div style="font-size: 18px; font-weight: 500; color: #0b1a33; margin-bottom: 6px;">拖拽或选择文件</div>
+        <div class="up-drop__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+        </div>
+        <div class="up-drop__title">拖拽文件到此处，或点击选择</div>
+        <div class="up-drop__sub">支持任意类型文件，选择后点击「上传」完成提交</div>
+        <span class="up-drop__pill">点击选择文件</span>
         <input type="file" id="archerFileInput" multiple style="display: none;" />
         `;
-    dropZone.style.border = "2px dashed #d7e0eb";
-    dropZone.style.borderRadius = "20px";
-    dropZone.style.padding = "52px 24px 48px";
-    dropZone.style.textAlign = "center";
-    dropZone.style.background = "#fafcff";
-    dropZone.style.transition = "background 0.2s, border-color 0.2s";
-    dropZone.style.cursor = "pointer";
-    dropZone.style.position = "relative";
     function addFile(file) {
         dropZone.style.display = "none";
         let k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
@@ -170,8 +487,8 @@ function createDropZone(container, options, uploadCallback) {
         document.getElementById('archerFileName').textContent = file.name;
         document.getElementById('archerFileSize').textContent = parseFloat((file.size / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         let fileItem = document.getElementById('archerFileItem');
-        fileItem.style.display = "block";
-        
+        fileItem.style.display = "flex";
+
         let uploadBtn = document.getElementById('archerUploadBtn');
         let clearBtn = document.getElementById('archerClearBtn');
         clearBtn.onclick = () => {
@@ -179,6 +496,7 @@ function createDropZone(container, options, uploadCallback) {
             uploadBtn.disabled = true;
             uploadBtn.style.opacity = "0.5";
             dropZone.style.display = "block";
+            document.getElementById('archerFileInput').value = "";
         };
         uploadBtn.disabled = false;
         uploadBtn.style.opacity = "1";
@@ -196,36 +514,25 @@ function createDropZone(container, options, uploadCallback) {
         };
     }
     dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();  
+        e.preventDefault();
         e.stopPropagation();
-        dropZone.style.borderColor = "#4a6cf7";
-        dropZone.style.background = "#f0f4ff";
+        dropZone.classList.add('is-active');
     });
     dropZone.addEventListener('dragleave', (e) => {
-        e.preventDefault();  
+        e.preventDefault();
         e.stopPropagation();
-        dropZone.style.borderColor = "#d7e0eb";
-        dropZone.style.background = "#fafcff";
+        dropZone.classList.remove('is-active');
     });
-    ['dragenter', 'drop'].forEach(eventName => {  
+    ['dragenter', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, (e) => {
-            e.preventDefault();  
-            e.stopPropagation();  
-        });  
-    }); 
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
     dropZone.addEventListener('drop', (e) => {
-        if (e.dataTransfer.files.length === 0) return;  
-        addFile(e.dataTransfer.files[0]);  
-    });
-    dropZone.addEventListener('mouseover', (e) => {   
-        e.preventDefault();
-        dropZone.style.borderColor = "#a0b8d4";
-        dropZone.style.background = "#f5f9ff";
-    });
-    dropZone.addEventListener('mouseout', (e) => {
-        e.preventDefault();
-        dropZone.style.borderColor = "#d7e0eb";
-        dropZone.style.background = "#fafcff";
+        dropZone.classList.remove('is-active');
+        if (e.dataTransfer.files.length === 0) return;
+        addFile(e.dataTransfer.files[0]);
     });
     dropZone.onclick = () => {
         const fileInput = document.getElementById('archerFileInput');
@@ -239,137 +546,80 @@ function createDropZone(container, options, uploadCallback) {
 }
 function createFileItem(container) {
     const fileItem = document.createElement('div');
-    fileItem.id = "archerFileItem";   
+    fileItem.id = "archerFileItem";
     fileItem.style.display = "none";
-    fileItem.style.alignItems = "center";
-    fileItem.style.justifyContent = "space-between";
-    fileItem.style.padding = "12px 16px";
-    fileItem.style.marginTop = "16px";
-    fileItem.style.background = "#fff";
-    fileItem.style.fontSize = "14px";
-    fileItem.style.color = "#0b1a33";
 
     fileItem.innerHTML = `
-        <div style="display: flex;">
-        <div id="archerFileName" style="width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
-        <div id="archerFileSize" style="width: 35%; text-align: right;"></div>
+        <div class="up-file">
+            <span class="up-file__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+                </svg>
+            </span>
+            <span id="archerFileName"></span>
+            <span id="archerFileSize"></span>
         </div>
     `;
 
     let progressBar = document.createElement('div');
     progressBar.id = "archerProgressBar";
     progressBar.style.display = "none";
-    progressBar.style.width = "100%";
-    progressBar.style.height = "20px";
-    progressBar.style.marginTop = "8px";
-    progressBar.innerHTML = `<div style="width: 100%; height: 6px; background: #eef3fe; border-radius: 3px; border: 1px solid #ccd4f5;">
-                                <div id="archerProgress" style="width: 0%; height: 100%; background: #4a6cf7; border-radius: 3px;"></div>
+    progressBar.innerHTML = `<div class="progress-track">
+                                <div id="archerProgress"></div>
                             </div>
-                            <div id="archerProgressText" style="text-align: center; font-size: 12px; color: #666; margin-top: 2px;">0%</div>`;
+                            <div id="archerProgressText">0%</div>`;
     fileItem.appendChild(progressBar);
 
     container.appendChild(fileItem);
 }
 function createActions(container) {
     const actions = document.createElement('div');
-    actions.style.marginTop = "24px";
-    actions.style.display = "flex";
-    actions.style.justifyContent = "flex-end";
-    actions.style.gap = "12px";
-    actions.style.flexWrap = "wrap";
-    
+    actions.className = "up-actions";
+
     let clearBtn = document.createElement('button');
     clearBtn.id = "archerClearBtn";
     clearBtn.type = "button";
-    clearBtn.innerHTML = "🗑 清空";
+    clearBtn.className = "btn btn--ghost";
+    clearBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>清空';
 
     let uploadBtn = document.createElement('button');
     uploadBtn.id = "archerUploadBtn";
     uploadBtn.type = "button";
     uploadBtn.disabled = true;
-    uploadBtn.innerHTML = "⬆ 上传";
-    
-    clearBtn.style.display = uploadBtn.style.display = "inline-flex";
-    clearBtn.style.alignItems = uploadBtn.style.alignItems = "center";
-    clearBtn.style.gap = uploadBtn.style.gap = "8px";
-    clearBtn.style.padding = uploadBtn.style.padding = "10px 26px";
-    clearBtn.style.borderRadius = uploadBtn.style.borderRadius = "18px";
-    clearBtn.style.fontSize = uploadBtn.style.fontSize = "15px";
-    clearBtn.style.fontWeight = uploadBtn.style.fontWeight = "500";
-    clearBtn.style.border = uploadBtn.style.border = "none";
-    clearBtn.style.color = uploadBtn.style.color = "#1f3a6b";
-    clearBtn.style.transition = uploadBtn.style.transition = "background 0.15s, transform 0.1s";
-    clearBtn.style.lineHeight = uploadBtn.style.lineHeight = "1.4";
-
-    clearBtn.style.background = "#eef3fe";
-    clearBtn.style.cursor = "pointer";
-    uploadBtn.style.cursor = "not-allowed";
-    uploadBtn.style.background = "#4a6cf7";
+    uploadBtn.className = "btn btn--primary";
     uploadBtn.style.opacity = "0.5";
-    uploadBtn.style.color = "#fff";
+    uploadBtn.style.cursor = "not-allowed";
+    uploadBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"/><path d="M6 9l6-6 6 6"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>上传';
 
-    clearBtn.addEventListener('mouseover', () => {
-        clearBtn.style.background = "#e1eafe";
-        clearBtn.style.borderColor = "#b0c4dd";
-        if(!clearBtn.disabled) {
-            clearBtn.style.cursor = "pointer";
-            clearBtn.style.opacity = "0.9";
-        } else {
-            clearBtn.style.cursor = "not-allowed";
-            clearBtn.style.opacity = "0.6";
-        }
-    });
-    clearBtn.addEventListener('mouseout', () => {
-        clearBtn.style.background = "#eef3fe";
-        clearBtn.style.borderColor = "transparent";
-        if(!clearBtn.disabled) {
-            clearBtn.style.cursor = "pointer";
-            clearBtn.style.opacity = "1";
-        } else {
-            clearBtn.style.cursor = "not-allowed";
-            clearBtn.style.opacity = "0.5";
-        }
-    });
     uploadBtn.addEventListener('mouseover', () => {
-        uploadBtn.style.borderColor = "#3a5de0";
-        if(!uploadBtn.disabled) {
-            uploadBtn.style.cursor = "pointer";
-            uploadBtn.style.opacity = "0.9";
-        } else {
-            uploadBtn.style.cursor = "not-allowed";
-            uploadBtn.style.opacity = "0.6";
-        }
+        uploadBtn.style.cursor = uploadBtn.disabled ? "not-allowed" : "pointer";
+        if(!uploadBtn.disabled) uploadBtn.style.opacity = "0.92";
     });
     uploadBtn.addEventListener('mouseout', () => {
-        uploadBtn.style.borderColor = "transparent";
-        if(!uploadBtn.disabled) {
-            uploadBtn.style.cursor = "pointer";
-            uploadBtn.style.opacity = "1";
-        } else {
-            uploadBtn.style.cursor = "not-allowed";
-            uploadBtn.style.opacity = "0.5";
-        }
+        uploadBtn.style.cursor = uploadBtn.disabled ? "not-allowed" : "pointer";
+        if(!uploadBtn.disabled) uploadBtn.style.opacity = "1";
     });
+    clearBtn.addEventListener('mouseover', () => {
+        clearBtn.style.cursor = clearBtn.disabled ? "not-allowed" : "pointer";
+    });
+    clearBtn.addEventListener('mouseout', () => {
+        clearBtn.style.cursor = clearBtn.disabled ? "not-allowed" : "pointer";
+    });
+
     actions.appendChild(clearBtn);
     actions.appendChild(uploadBtn);
     container.appendChild(actions);
 }
 function drawUploadWindow(options, uploadCallback) {
     let container = document.getElementById("archerUploadContainer");
+    let mask = document.getElementById('modalMask');
     if (container) {
         container.style.display = "block";
+        if(mask) mask.style.display = "block";
         return;
     }
     container = document.createElement('div');
     container.id = "archerUploadContainer";
-    container.style.width = '100%';
-    container.style.maxWidth = '600px';
-    container.style.background = '#ffffff';
-    container.style.borderRadius = '18px';
-    container.style.boxShadow = '0 20px 60px rgba(0, 20, 40, 0.08), 0 8px 24px rgba(0, 0, 0, 0.04)';
-    container.style.padding = '20px 36px 40px';
-    container.style.transition = 'box-shadow 0.25s ease';
-    container.style.zIndex = options?.zIndex || '999';
     if(options?.left !== undefined && options?.top !== undefined) {
         container.style.position = 'absolute';
         container.style.left = options.left + 'px';
@@ -380,6 +630,7 @@ function drawUploadWindow(options, uploadCallback) {
         container.style.top = '50%';
         container.style.transform = 'translate(-50%, -50%)';
     }
+    if(mask) mask.style.display = "block";
     createHeader(container);
     createDropZone(container, {showProgressBar: options?.showProgressBar}, uploadCallback);
     createFileItem(container);
@@ -403,6 +654,10 @@ function finishAndCloseUploadWindow(options, finishCallback) {
         progressText.textContent = '完成';
         setTimeout(() => {
             initElements();
+            let mask = document.getElementById('modalMask');
+            if(mask && document.getElementById('deletePanel').style.display !== 'block') {
+                mask.style.display = 'none';
+            }
             if (finishCallback) {
                 finishCallback();
             }
@@ -411,26 +666,26 @@ function finishAndCloseUploadWindow(options, finishCallback) {
         progressText.textContent = options.content || "失败"
     }
 }
-function uploadFile(file) { 
-    let formData = new FormData();  
-    formData.append('file', file); 
-    let xhr = new XMLHttpRequest(); 
-    xhr.upload.addEventListener('progress', function(event) { 
-        if (event.lengthComputable) {  
+function uploadFile(file) {
+    let formData = new FormData();
+    formData.append('file', file);
+    let xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener('progress', function(event) {
+        if (event.lengthComputable) {
             let percentComplete = Math.ceil((event.loaded / event.total) * 100);
             updateProgress(percentComplete);
-        }  
-    });  
-    xhr.addEventListener('load', function() { 
+        }
+    });
+    xhr.addEventListener('load', function() {
         finishAndCloseUploadWindow({success: true}, null);
         refreshFileList();
-    });  
-    xhr.addEventListener('error', function() { 
+    });
+    xhr.addEventListener('error', function() {
         finishAndCloseUploadWindow({success: false}, null);
-    }); 
+    });
     xhr.open('POST', '/upload', true);
-    xhr.send(formData); 
-}  
+    xhr.send(formData);
+}
 function downloadFileByName(name) {
     window.open('/download?filename='+name);
 }
@@ -440,6 +695,8 @@ function showFileByUrl(url) {
 function showDeletePanel(name) {
     let deleteEl = document.getElementById('deletePanel');
     deleteEl.style.display = "block";
+    document.getElementById('modalMask').style.display = "block";
+    document.getElementById('pwdInput').focus();
     document.getElementById('confirmDelete').onclick = () => {
         let input = document.getElementById('pwdInput');
         let error = document.getElementById('pwdErrorMsg');
@@ -450,12 +707,13 @@ function showDeletePanel(name) {
         let xhr = new XMLHttpRequest();
         xhr.open('POST', '/remove', false);
         xhr.setRequestHeader("content-type", "application/json");
-        xhr.send(JSON.stringify({name, password: input.value})); 
+        xhr.send(JSON.stringify({name, password: input.value}));
         if(xhr.status === 200) {
             let res = JSON.parse(xhr.responseText);
             if(res.success) {
                 deleteEl.display = 'none';
                 input.value = ""
+                hideDeletePanel();
                 refreshFileList();
                 return ;
             }
@@ -465,12 +723,13 @@ function showDeletePanel(name) {
 }
 function hideDeletePanel() {
     document.getElementById('deletePanel').style.display = "none";
+    document.getElementById('modalMask').style.display = "none";
     document.getElementById('pwdInput').value = '';
     document.getElementById('pwdErrorMsg').innerHTML = '';
 }
 function fileNameHoverIn(e, i) {
     let left = e.clientX - 28;
-    let top = document.getElementById(`file-name-${i}`).getBoundingClientRect().bottom + 8;
+    let top = document.getElementById(`file-name-${i}`).getBoundingClientRect().bottom + 10;
     drawToolTips("点击预览", {top, left});
 }
 function fileNameHoverOut() {
@@ -479,9 +738,9 @@ function fileNameHoverOut() {
 function refreshFileList() {
     let data = {total: 0, pageNum: 1, files: []};
     try {
-        let xhr = new XMLHttpRequest();  
-        xhr.open('GET', '/list?pageNum=1', false);  
-        xhr.send(null); 
+        let xhr = new XMLHttpRequest();
+        xhr.open('GET', '/list?pageNum=1', false);
+        xhr.send(null);
         if(xhr.status === 200) {
             let res = JSON.parse(xhr.responseText);
             if(res.success && res.data) {
@@ -491,31 +750,51 @@ function refreshFileList() {
     } catch(err) {
         console.log(err);
     }
-    let fileList = document.getElementById('file-list');  
+    let fileList = document.getElementById('file-list');
+    let countEl = document.getElementById('file-count');
+    if(countEl) countEl.textContent = data.files.length;
+    if(data.files.length === 0) {
+        fileList.innerHTML = `
+        <div class="empty">
+            <div class="empty__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 7h5l2 2.5h9A1.5 1.5 0 0 1 21.5 11v6.5A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5V8.5A1.5 1.5 0 0 1 4 7z"/>
+                </svg>
+            </div>
+            <div class="empty__title">暂无文件</div>
+            <div class="empty__desc">点击右上角「＋」上传第一个文件</div>
+        </div>`;
+        return;
+    }
     let html = "", i = 0, fUrl = '', fName = '';
     for(let f of data.files) {
         fName = truncateByCanvas(f.name, 800, 20);
         html += `
-        <div class="file-item" style="display: flex; padding: 10px 30px;">
-            <div id="file-name-${i}" style="width: calc(100% - 310px);"><div style="cursor:pointer; max-width:100%;width:fit-content;font-size: 20px; font-weight: 400; font-family:Arial, Helvetica, sans-serif; color: #3787e8;" onclick="showFileByUrl('/${f.url}')" onmouseover="fileNameHoverIn(event, ${i})" onmouseout="fileNameHoverOut()">${fName}</div></div>
-            <div style="width: 250px;font-size: 16px;color: darkgrey; display: flex; align-items: flex-end;padding-bottom: 4px;text-align: center;">${f.time}</div>
-            <div style="display: flex;justify-content: space-between; width: 50px">
-                <div style="width: 24px;color: #3787e8; cursor:pointer" onclick="downloadFileByName('${f.name}')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
+        <div class="file-item" style="--i:${i}">
+            <span class="file-item__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+                </svg>
+            </span>
+            <div id="file-name-${i}" class="c-name"><div class="name-link" title="${f.name}" onclick="showFileByUrl('/${f.url}')" onmouseover="fileNameHoverIn(event, ${i})" onmouseout="fileNameHoverOut()">${fName}</div></div>
+            <div class="c-time">${f.time}</div>
+            <div class="c-op">
+                <div class="op-btn" title="下载" onclick="downloadFileByName('${f.name}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
                 </div>
-                <div style="width: 24px;color: #3787e8; cursor:pointer" onclick="showDeletePanel('${f.name}')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <div class="op-btn op-btn--danger" title="删除" onclick="showDeletePanel('${f.name}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                     </svg>
                 </div>
             </div>
         </div>`;
-        i++;
+        i++
     }
     fileList.innerHTML = html;
 }
@@ -529,12 +808,38 @@ window.onload = function() {
     };
     addFileEl.onmouseover = (e) => {
         let rect = addFileEl.getBoundingClientRect();
-        let left = rect.right - 40, top = rect.bottom + 16;
-        drawToolTips("新增",{left, top});
+        let left = rect.right - 40, top = rect.bottom + 14;
+        drawToolTips("新增文件",{left, top});
     }
     addFileEl.onmouseout = () => {
         removeToolTips();
     }
+    let refreshEl = document.getElementById('refresh-list');
+    refreshEl.onclick = () => {
+        refreshEl.classList.remove('spin');
+        void refreshEl.offsetWidth;
+        refreshEl.classList.add('spin');
+        refreshFileList();
+    };
+    refreshEl.onmouseover = (e) => {
+        let rect = refreshEl.getBoundingClientRect();
+        drawToolTips("刷新列表", {left: rect.right - 60, top: rect.bottom + 14});
+    }
+    refreshEl.onmouseout = () => {
+        removeToolTips();
+    }
+    document.getElementById('modalMask').onclick = () => {
+        let panel = document.getElementById('deletePanel');
+        if(panel.style.display === 'block') {
+            hideDeletePanel();
+        } else if(document.getElementById('archerUploadContainer')) {
+            initElements();
+            document.getElementById('modalMask').style.display = 'none';
+        }
+    };
+    document.getElementById('pwdInput').onkeydown = (e) => {
+        if(e.key === 'Enter') document.getElementById('confirmDelete').click();
+    };
 };
 </script>
 </body>
